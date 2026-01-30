@@ -22,6 +22,8 @@ from district_pathway_analyzer.models import (
     DistrictAnalysisReport,
     DistrictInput,
     PipelineStatus,
+    Source,
+    SourceType,
 )
 from district_pathway_analyzer.report import ReportGenerator
 from district_pathway_analyzer.tagging import DomainTagger
@@ -161,6 +163,21 @@ class DistrictPathwayAnalyzer:
                     courses = self.extractor.raw_to_inventory(raw_data)
                     courses = self.extractor.filter_digital_courses(courses)
                     inventory.courses.extend(courses)
+
+                    # Add uploaded document as a valid source
+                    # User-provided documents are assumed to be valid
+                    doc_path_obj = Path(doc_path)
+                    source_type = SourceType.PDF if doc_path_obj.suffix.lower() == ".pdf" else SourceType.HTML
+                    source = Source(
+                        url=f"file://{doc_path_obj.absolute()}",
+                        source_type=source_type,
+                        confidence=1.0,  # User-provided files are trusted
+                        date_accessed=datetime.now().isoformat(),
+                        is_valid=True,
+                        validation_reason="User-provided document",
+                    )
+                    inventory.sources.append(source)
+
                     logger.info(f"Extracted {len(courses)} courses from {doc_path}")
                 except Exception as e:
                     logger.error(f"Failed to extract from {doc_path}: {e}")
