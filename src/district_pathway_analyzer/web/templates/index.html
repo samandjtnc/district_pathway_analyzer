@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>District Pathway Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            color: white;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            color: #1a1a2e;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #444;
+        }
+
+        .form-group input[type="text"],
+        .form-group select {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .file-upload {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fafafa;
+        }
+
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .file-upload.has-file {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-upload-text {
+            color: #666;
+        }
+
+        .file-name {
+            margin-top: 0.5rem;
+            font-weight: 500;
+            color: #22c55e;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Progress Section */
+        .progress-section {
+            display: none;
+        }
+
+        .progress-section.active {
+            display: block;
+        }
+
+        .progress-bar-container {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e0e0e0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-badge.failed {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .stat-card .label {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card .value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 1.5rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .narrative-box {
+            background: #f8fafc;
+            border-left: 4px solid #667eea;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+            line-height: 1.6;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .tag {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+
+        .tag.opportunity {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .tag.risk {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .course-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .course-table th,
+        .course-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .course-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+            font-size: 0.875rem;
+        }
+
+        .course-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .recommendation-card {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 2px solid #667eea40;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .recommendation-card h4 {
+            color: #4338ca;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .confidence-badge.high {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .confidence-badge.medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .confidence-badge.low {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 1rem;
+            color: #991b1b;
+            margin: 1rem 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 1rem;
+            color: #92400e;
+            margin: 1rem 0;
+        }
+
+        .reset-btn {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 1rem;
+        }
+
+        .reset-btn:hover {
+            background: #e2e8f0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.875rem;
+        }
+
+        footer a {
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header h1 {
+                font-size: 1.75rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>District Pathway Analyzer</h1>
+            <p>AI-Powered CTE Pathway Analysis for AI Foundations Integration</p>
+        </header>
+
+        <!-- Input Form -->
+        <div class="card" id="input-section">
+            <h2>Analyze a District</h2>
+            <form id="analysis-form">
+                <div class="form-group">
+                    <label for="district_name">District Name</label>
+                    <input type="text" id="district_name" name="district_name"
+                           placeholder="e.g., Johnston County Schools" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="state">State</label>
+                    <input type="text" id="state" name="state"
+                           placeholder="e.g., North Carolina or NC" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Course Catalog Document (PDF)</label>
+                    <div class="file-upload" id="file-upload">
+                        <input type="file" id="document" name="document" accept=".pdf,.html,.htm">
+                        <div class="file-upload-icon">📄</div>
+                        <div class="file-upload-text">
+                            Click or drag to upload a CTE course catalog
+                        </div>
+                        <div class="file-name" id="file-name"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    <span>🔍</span> Analyze District
+                </button>
+            </form>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="card progress-section" id="progress-section">
+            <h2><span class="spinner"></span> Analysis in Progress</h2>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar" style="width: 30%"></div>
+            </div>
+            <p class="progress-text" id="progress-text">Starting analysis...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="results-section">
+            <!-- Results will be dynamically populated -->
+        </div>
+    </div>
+
+    <footer>
+        <p>Powered by <a href="https://code.org" target="_blank">Code.org</a> |
+           <a href="https://github.com/code-dot-org" target="_blank">View on GitHub</a></p>
+    </footer>
+
+    <script>
+        // State management
+        let currentJobId = null;
+        let pollInterval = null;
+
+        // DOM Elements
+        const form = document.getElementById('analysis-form');
+        const inputSection = document.getElementById('input-section');
+        const progressSection = document.getElementById('progress-section');
+        const resultsSection = document.getElementById('results-section');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const submitBtn = document.getElementById('submit-btn');
+        const fileUpload = document.getElementById('file-upload');
+        const fileInput = document.getElementById('document');
+        const fileName = document.getElementById('file-name');
+
+        // File upload handling
+        fileUpload.addEventListener('click', () => fileInput.click());
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = '#667eea';
+        });
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.style.borderColor = '#ccc';
+        });
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.style.borderColor = '#ccc';
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            }
+        });
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length) {
+                fileName.textContent = fileInput.files[0].name;
+                fileUpload.classList.add('has-file');
+            } else {
+                fileName.textContent = '';
+                fileUpload.classList.remove('has-file');
+            }
+        }
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+
+            try {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner"></span> Starting...';
+
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start analysis');
+                }
+
+                const data = await response.json();
+                currentJobId = data.job_id;
+
+                // Show progress section
+                inputSection.style.display = 'none';
+                progressSection.classList.add('active');
+                resultsSection.classList.remove('active');
+
+                // Start polling for status
+                startPolling();
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to start analysis: ' + error.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>🔍</span> Analyze District';
+            }
+        });
+
+        function startPolling() {
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/status/${currentJobId}`);
+                    const data = await response.json();
+
+                    progressText.textContent = data.progress;
+
+                    if (data.status === 'running') {
+                        progressBar.style.width = '60%';
+                    } else if (data.status === 'completed') {
+                        progressBar.style.width = '100%';
+                        clearInterval(pollInterval);
+                        setTimeout(() => showResults(data.result), 500);
+                    } else if (data.status === 'failed') {
+                        clearInterval(pollInterval);
+                        showError(data.error);
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 1000);
+        }
+
+        function showResults(result) {
+            progressSection.classList.remove('active');
+            resultsSection.classList.add('active');
+            resultsSection.innerHTML = renderResults(result);
+        }
+
+        function showError(error) {
+            progressSection.classList.remove('active');
+            resultsSection.classList.add('active');
+            resultsSection.innerHTML = `
+                <div class="card">
+                    <h2>Analysis Failed</h2>
+                    <div class="error-box">
+                        <strong>Error:</strong> ${error}
+                    </div>
+                    <button class="reset-btn" onclick="resetForm()">Try Again</button>
+                </div>
+            `;
+        }
+
+        function renderResults(result) {
+            const isSuccess = result.pipeline_status === 'success';
+
+            let html = `
+                <div class="card">
+                    <h2>
+                        Analysis Results: ${result.district_name}, ${result.state}
+                        <span class="status-badge ${isSuccess ? 'success' : 'failed'}">
+                            ${isSuccess ? '✓ Complete' : '✗ Incomplete'}
+                        </span>
+                    </h2>
+            `;
+
+            if (result.errors && result.errors.length > 0) {
+                html += `<div class="error-box"><strong>Errors:</strong><ul>`;
+                result.errors.forEach(err => {
+                    html += `<li>${err}</li>`;
+                });
+                html += `</ul></div>`;
+            }
+
+            if (result.warnings && result.warnings.length > 0) {
+                html += `<div class="warning-box"><strong>Warnings:</strong><ul>`;
+                result.warnings.forEach(warn => {
+                    html += `<li>${warn.substring(0, 200)}...</li>`;
+                });
+                html += `</ul></div>`;
+            }
+
+            if (result.landscape) {
+                html += `
+                    <div class="result-grid">
+                        <div class="stat-card">
+                            <div class="label">Courses Found</div>
+                            <div class="value">${result.landscape.course_count}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Pathway Shape</div>
+                            <div class="value">${formatValue(result.landscape.pathway_shape)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Entry Point</div>
+                            <div class="value">${result.landscape.entry_point.course || 'Not identified'}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Domain Coverage</div>
+                            <div class="value">${formatValue(result.landscape.domain_coverage.pattern)}</div>
+                        </div>
+                    </div>
+
+                    <h3 class="section-title">Landscape Summary</h3>
+                    <div class="narrative-box">${result.landscape.landscape_summary}</div>
+
+                    <h3 class="section-title">Identified Pathways</h3>
+                    <div class="tag-list">
+                        ${result.landscape.identified_pathways.map(p => `<span class="tag">${p}</span>`).join('')}
+                    </div>
+                `;
+            }
+
+            if (result.alignment) {
+                html += `
+                    <h3 class="section-title">Alignment Analysis</h3>
+                    <div class="narrative-box">${result.alignment.narrative}</div>
+
+                    <div class="result-grid">
+                        <div class="stat-card">
+                            <div class="label">Entry Timing</div>
+                            <div class="value">${formatValue(result.alignment.profile.entry_timing)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Specialization</div>
+                            <div class="value">${formatValue(result.alignment.profile.specialization)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Coherence</div>
+                            <div class="value">${formatValue(result.alignment.profile.coherence)}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">AI Integration</div>
+                            <div class="value">${formatValue(result.alignment.profile.ai_integration)}</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-top: 1rem; color: #166534;">Opportunities</h4>
+                    <div class="tag-list">
+                        ${result.alignment.opportunities.map(o => `<span class="tag opportunity">${o}</span>`).join('')}
+                    </div>
+
+                    ${result.alignment.risks.length > 0 ? `
+                        <h4 style="margin-top: 1rem; color: #92400e;">Risk Considerations</h4>
+                        <div class="tag-list">
+                            ${result.alignment.risks.map(r => `<span class="tag risk">${r}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                `;
+            }
+
+            if (result.design) {
+                html += `
+                    <h3 class="section-title">Recommended Strategy</h3>
+                    <div class="recommendation-card">
+                        <h4>
+                            ${formatValue(result.design.strategy)}
+                            <span class="confidence-badge ${result.design.confidence}">${result.design.confidence}</span>
+                        </h4>
+                        <p><strong>AI Foundations Role:</strong> ${formatValue(result.design.role)}</p>
+                        ${result.design.existing_course ? `<p><strong>Align with:</strong> ${result.design.existing_course}</p>` : ''}
+                        <div class="narrative-box" style="margin-top: 1rem; background: white;">
+                            ${result.design.narrative}
+                        </div>
+                    </div>
+
+                    <div class="result-grid">
+                        <div class="stat-card">
+                            <div class="label">Grade Band</div>
+                            <div class="value">${result.design.variables.grade_band}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Credit Framing</div>
+                            <div class="value">${result.design.variables.credit_framing}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Entry Strength</div>
+                            <div class="value">${formatValue(result.design.variables.entry_strength)}</div>
+                        </div>
+                    </div>
+
+                    ${result.design.downstream_pathways.length > 0 ? `
+                        <h3 class="section-title">Downstream Pathway Connections</h3>
+                        <table class="course-table">
+                            <thead>
+                                <tr>
+                                    <th>Pathway</th>
+                                    <th>Relationship</th>
+                                    <th>Courses</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.design.downstream_pathways.map(dp => `
+                                    <tr>
+                                        <td>${dp.name}</td>
+                                        <td>${formatValue(dp.relationship)}</td>
+                                        <td>${dp.courses.slice(0, 3).join(', ')}${dp.courses.length > 3 ? '...' : ''}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : ''}
+
+                    ${result.design.assumptions.length > 0 ? `
+                        <h4 style="margin-top: 1rem;">Assumptions</h4>
+                        <ul style="margin-left: 1.5rem; color: #64748b;">
+                            ${result.design.assumptions.map(a => `<li>${a}</li>`).join('')}
+                        </ul>
+                    ` : ''}
+                `;
+            }
+
+            if (result.landscape && result.landscape.courses) {
+                html += `
+                    <h3 class="section-title">Course Inventory (${result.landscape.courses.length} courses)</h3>
+                    <table class="course-table">
+                        <thead>
+                            <tr>
+                                <th>Course Title</th>
+                                <th>Domain</th>
+                                <th>Role</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${result.landscape.courses.map(c => `
+                                <tr>
+                                    <td>${c.title}</td>
+                                    <td>${c.domain || '-'}</td>
+                                    <td>${c.role ? formatValue(c.role) : '-'}</td>
+                                    <td>${c.confidence}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            html += `
+                    <button class="reset-btn" onclick="resetForm()">Analyze Another District</button>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function formatValue(value) {
+            if (!value) return '-';
+            return value
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function resetForm() {
+            currentJobId = null;
+            if (pollInterval) clearInterval(pollInterval);
+
+            form.reset();
+            fileName.textContent = '';
+            fileUpload.classList.remove('has-file');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>🔍</span> Analyze District';
+            progressBar.style.width = '30%';
+
+            inputSection.style.display = 'block';
+            progressSection.classList.remove('active');
+            resultsSection.classList.remove('active');
+        }
+    </script>
+</body>
+</html>
