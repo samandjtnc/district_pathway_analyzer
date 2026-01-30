@@ -4,15 +4,13 @@ Source validation and discovery gate checking.
 
 import logging
 from datetime import datetime
-from typing import List, Optional, Set
+from typing import Optional
 from urllib.parse import urlparse
 
 from district_pathway_analyzer.config import get_config
 from district_pathway_analyzer.models import (
     ConfidenceLevel,
     CourseInventory,
-    CourseInventoryItem,
-    DigitalDomain,
     DiscoveryGateResult,
     Source,
     SourceValidation,
@@ -101,14 +99,15 @@ class SourceValidator:
 
 
 class DiscoveryGate:
-    """Checks if discovery results pass the gate criteria."""
+    """Checks if discovery results pass the gate criteria.
 
-    # Major domain groups that should be covered
-    DOMAIN_GROUPS = {
-        "CS/Software": {DigitalDomain.COMPUTER_SCIENCE, DigitalDomain.SOFTWARE_DEV},
-        "IT/Cyber": {DigitalDomain.CYBERSECURITY, DigitalDomain.IT_SYSTEMS},
-        "Digital Media": {DigitalDomain.DIGITAL_MEDIA},
-    }
+    The discovery gate focuses on data availability and quality:
+    - At least 1 verified source
+    - Minimum number of courses found
+    - Acceptable confidence levels
+
+    Note: Domain coverage is checked AFTER tagging in Phase 1, not here.
+    """
 
     def __init__(self):
         """Initialize the gate checker."""
@@ -128,6 +127,14 @@ class DiscoveryGate:
 
         issues = []
         suggestions = []
+
+        # Log extracted courses for debugging
+        if inventory.courses:
+            logger.info(f"Discovery found {len(inventory.courses)} courses:")
+            for i, course in enumerate(inventory.courses, 1):
+                logger.info(f"  {i}. {course.title} [{course.confidence.value}]")
+        else:
+            logger.warning("No courses were extracted from the sources")
 
         # Check 1: At least 1 verified source
         verified_sources = [s for s in inventory.sources if s.is_valid]
@@ -168,32 +175,12 @@ class DiscoveryGate:
             )
             suggestions.append("Provide clearer course descriptions or catalog")
 
-        # Check 5: Domain coverage (at least one major group)
-        domains_covered = self._get_covered_domains(inventory.courses)
-        result.domains_covered = list(domains_covered)
-
-        groups_covered = 0
-        for group_name, group_domains in self.DOMAIN_GROUPS.items():
-            if domains_covered & {d.value for d in group_domains}:
-                groups_covered += 1
-
-        if groups_covered == 0:
-            issues.append("No major digital domain group covered")
-            suggestions.append(
-                "Verify that source contains computer science, IT, or digital media courses"
-            )
+        # Note: Domain coverage is checked AFTER tagging in Phase 1, not here.
+        # At this stage, courses don't have domain_tags assigned yet.
+        # The discovery gate focuses on: sources, course count, and confidence levels.
 
         # Determine pass/fail
-        critical_issues = [
-            i
-            for i in issues
-            if "No verified sources" in i or "No major digital domain" in i
-        ]
-
-        if critical_issues:
-            result.passed = False
-            result.reason = critical_issues[0]
-        elif len(issues) >= 3:
+        if len(issues) >= 3:
             result.passed = False
             result.reason = "Multiple data quality issues"
         elif result.courses_found < min_courses:
@@ -207,22 +194,6 @@ class DiscoveryGate:
         result.suggestions = suggestions
 
         return result
-
-    def _get_covered_domains(self, courses: List[CourseInventoryItem]) -> Set[str]:
-        """Get set of domains covered by courses.
-
-        Args:
-            courses: List of courses
-
-        Returns:
-            Set of domain names covered
-        """
-        domains = set()
-        for course in courses:
-            if course.domain_tags:
-                domains.add(course.domain_tags.primary)
-                domains.update(course.domain_tags.secondary)
-        return domains
 
     def generate_failure_message(self, result: DiscoveryGateResult) -> str:
         """Generate a user-friendly failure message.
