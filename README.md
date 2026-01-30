@@ -55,6 +55,23 @@ cp .env.example .env
 
 ## Usage
 
+### Web Interface
+
+The easiest way to use the analyzer is through the web interface:
+
+```bash
+# Start the web server
+pathway-analyzer-web
+
+# Or with custom host/port
+HOST=127.0.0.1 PORT=8080 pathway-analyzer-web
+```
+
+Then open http://localhost:8000 in your browser. You can:
+1. Enter the district name and state
+2. Upload a PDF course catalog
+3. Click "Analyze District" and watch the results appear
+
 ### Command Line Interface
 
 #### Analyze a District
@@ -228,7 +245,11 @@ district_pathway_analyzer/
 │       ├── design/              # Phase 4: Pathway Design
 │       ├── report/              # Report Generation
 │       ├── knowledge_base/      # Reference documents
-│       └── utils/               # Utilities
+│       ├── utils/               # Utilities
+│       └── web/                 # Web interface
+│           ├── server.py        # FastAPI server
+│           ├── static/          # CSS, JS assets
+│           └── templates/       # HTML templates
 ├── tests/
 ├── config.yaml
 ├── pyproject.toml
