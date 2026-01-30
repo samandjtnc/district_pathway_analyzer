@@ -39,6 +39,10 @@ dependencies = [
     "click>=8.1.0",
     "jinja2>=3.1.0",
     "markdown>=3.5.0",
+    # Web dependencies
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +57,7 @@ dev = [
 
 [project.scripts]
 pathway-analyzer = "district_pathway_analyzer.cli:main"
+pathway-analyzer-web = "district_pathway_analyzer.web.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
