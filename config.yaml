@@ -1,0 +1,33 @@
+# District Pathway Analyzer Configuration
+# ========================================
+
+knowledge_base:
+  ai_foundations_pdf: "assets/AI_Foundations.pdf"
+  career_clusters_pdf: "assets/Guidebook-National-Career-Clusters-Framework.pdf"
+
+llm:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 4000
+  temperature: 0.3
+
+discovery:
+  max_search_results: 10
+  timeout_seconds: 30
+  cache_enabled: true
+  cache_ttl_days: 30
+
+gates:
+  min_courses_found: 3
+  min_verified_percentage: 0.80
+  max_uncertain_percentage: 0.20
+
+output:
+  default_format: "pdf"
+  include_technical_notes: true
+  include_assumptions: true
+  logo_path: "assets/code_org_logo.png"
+
+logging:
+  level: "INFO"
+  file: "logs/analysis.log"

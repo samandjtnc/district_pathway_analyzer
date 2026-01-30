@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "district-pathway-analyzer"
+version = "1.0.0"
+description = "AI-Powered District CTE Pathway Analysis Tool for analyzing school district CTE programs"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Code.org", email = "support@code.org"}
+]
+keywords = ["education", "cte", "pathway-analysis", "ai", "curriculum"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "anthropic>=0.18.0",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.31.0",
+    "reportlab>=4.0.0",
+    "weasyprint>=60.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0.0",
+    "aiohttp>=3.9.0",
+    "httpx>=0.26.0",
+    "PyPDF2>=3.0.0",
+    "pdf2image>=1.16.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "click>=8.1.0",
+    "jinja2>=3.1.0",
+    "markdown>=3.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+pathway-analyzer = "district_pathway_analyzer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
