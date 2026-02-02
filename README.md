@@ -23,12 +23,51 @@ This tool automates the analysis of school district CTE programs to:
 
 ## Installation
 
-### Prerequisites
+### Option 1: Docker (Recommended for Servers)
 
+The easiest way to deploy on a server:
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/district-pathway-analyzer.git
+cd district-pathway-analyzer
+
+# Create .env file with your API key
+echo 'ANTHROPIC_API_KEY=your_key_here' > .env
+
+# Deploy with the script
+./deploy.sh
+
+# Or manually with Docker Compose
+docker compose up -d
+```
+
+The web interface will be available at `http://your-server-ip:8000`
+
+**Docker Commands:**
+```bash
+# View logs
+docker compose logs -f
+
+# Stop the service
+docker compose down
+
+# Restart
+docker compose restart
+
+# Rebuild after updates
+docker compose build && docker compose up -d
+```
+
+### Option 2: Local Installation
+
+For development or running without Docker.
+
+**Prerequisites:**
 - Python 3.10 or higher
 - Anthropic API key
 
-### Setup
+**Setup:**
 
 1. Clone the repository:
 ```bash
