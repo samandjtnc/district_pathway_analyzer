@@ -11,14 +11,12 @@ ENV HOST=0.0.0.0
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
-    libffi-dev \
-    shared-mime-info \
+# Install minimal system dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        libffi-dev \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
@@ -26,8 +24,26 @@ COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY config.yaml ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -e .
+# Install Python dependencies (skip weasyprint extras that need system libs)
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir \
+        anthropic \
+        beautifulsoup4 \
+        requests \
+        pyyaml \
+        pydantic \
+        aiohttp \
+        httpx \
+        PyPDF2 \
+        python-dotenv \
+        rich \
+        click \
+        jinja2 \
+        markdown \
+        fastapi \
+        "uvicorn[standard]" \
+        python-multipart \
+    && pip install --no-cache-dir -e . --no-deps
 
 # Create directories for logs and reports
 RUN mkdir -p logs reports cache
