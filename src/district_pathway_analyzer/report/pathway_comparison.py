@@ -191,6 +191,7 @@ class PathwayComparisonGenerator:
             used_indices.add(i)
 
             # Look for related courses using multiple signals
+            candidate_indices = []
             for j, other_course in enumerate(courses):
                 if j in used_indices or j == i:
                     continue
@@ -199,22 +200,39 @@ class PathwayComparisonGenerator:
                 similarity = self._compute_title_similarity(course['title'], other_course['title'])
                 is_similar = similarity >= 0.7
 
-                # Signal 2: Sequential in document + compatible roles
-                # (e.g., exploratory followed by concentrator in same domain)
+                # Signal 2: Sequential in document + compatible roles + MINIMUM similarity
+                # This prevents grouping totally unrelated courses just because they're next to each other
                 is_sequential = abs(j - i) <= 3  # Within 3 positions
                 role_order = ['exploratory', 'gatekeeper', 'concentrator', 'capstone']
                 current_role_idx = role_order.index(course['role']) if course['role'] in role_order else -1
                 other_role_idx = role_order.index(other_course['role']) if other_course['role'] in role_order else -1
                 is_role_progression = (current_role_idx >= 0 and other_role_idx >= 0 and
                                      other_role_idx >= current_role_idx)
+                # ADDED: Require at least SOME similarity even for sequential courses
+                has_minimum_similarity = similarity >= 0.25
 
                 # Signal 3: Moderate similarity + sequential
                 is_moderate_and_sequential = similarity >= 0.4 and is_sequential
 
                 # Group if any strong signal is present
-                if is_similar or (is_sequential and is_role_progression) or is_moderate_and_sequential:
+                if is_similar or (is_sequential and is_role_progression and has_minimum_similarity) or is_moderate_and_sequential:
                     sequence_courses.append(other_course)
-                    used_indices.add(j)
+                    candidate_indices.append(j)
+
+            # SANITY CHECK: Validate pathway coherence
+            if len(sequence_courses) > 1:
+                original_count = len(sequence_courses)
+                sequence_courses = self._validate_pathway_coherence(sequence_courses)
+
+                # Only mark as used the courses that passed coherence check
+                # (First course is always kept, so we skip it)
+                kept_count = len(sequence_courses)
+                for idx in candidate_indices[:kept_count - 1]:
+                    used_indices.add(idx)
+            else:
+                # Mark all candidates as used since no filtering happened
+                for idx in candidate_indices:
+                    used_indices.add(idx)
 
             # Sort by: sequence number, then role, then document order
             sequence_courses.sort(key=lambda c: (
@@ -232,6 +250,67 @@ class PathwayComparisonGenerator:
             sequences[sequence_name] = sequence_courses
 
         return sequences
+
+    def _validate_pathway_coherence(self, courses: List[Dict]) -> List[Dict]:
+        """Validate that courses in a pathway are topically coherent.
+
+        Split out courses that don't belong based on title coherence.
+
+        Args:
+            courses: List of courses in a potential pathway
+
+        Returns:
+            Filtered list of courses that are topically coherent
+        """
+        if len(courses) <= 2:
+            return courses  # Keep small sequences together
+
+        # Extract meaningful keywords from all titles (excluding stop words and common CTE terms)
+        def get_topic_keywords(title: str) -> Set[str]:
+            words = set(re.findall(r'\w+', title.lower()))
+            stop_words = {'intro', 'introduction', 'to', 'and', 'the', 'a', 'an', 'of',
+                         'in', 'for', 'i', 'ii', 'iii', 'iv', '1', '2', '3', '4',
+                         'beginning', 'intermediate', 'advanced', 'one', 'two', 'three'}
+            return words - stop_words
+
+        # Get keywords from first course (the anchor)
+        anchor_keywords = get_topic_keywords(courses[0]['title'])
+
+        if not anchor_keywords:
+            return courses  # No meaningful keywords to check
+
+        coherent_courses = [courses[0]]
+
+        # Check each subsequent course for topical coherence
+        for course in courses[1:]:
+            course_keywords = get_topic_keywords(course['title'])
+
+            if not course_keywords:
+                coherent_courses.append(course)  # Keep generic courses
+                continue
+
+            # Check if course shares ANY significant keywords with anchor
+            # OR if it shares keywords with the pathway name we'd infer
+            shared_keywords = anchor_keywords & course_keywords
+
+            # Also check against accumulated coherent courses
+            all_coherent_keywords = set()
+            for coherent_course in coherent_courses:
+                all_coherent_keywords |= get_topic_keywords(coherent_course['title'])
+
+            course_shared_with_group = course_keywords & all_coherent_keywords
+
+            # Keep course if it shares keywords OR has high similarity with ANY course in group
+            max_similarity = max(
+                self._compute_title_similarity(course['title'], coherent_course['title'])
+                for coherent_course in coherent_courses
+            )
+
+            if shared_keywords or course_shared_with_group or max_similarity >= 0.5:
+                coherent_courses.append(course)
+            # else: drop this course from the sequence (it'll form its own pathway)
+
+        return coherent_courses
 
     def _infer_pathway_name(self, courses: List[Dict]) -> str:
         """Infer a pathway name from a sequence of courses.
