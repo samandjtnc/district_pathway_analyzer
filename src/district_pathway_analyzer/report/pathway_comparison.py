@@ -161,16 +161,23 @@ class PathwayComparisonGenerator:
         return intersection / union if union > 0 else 0.0
 
     def _group_into_sequences(self, courses: List[Dict]) -> Dict[str, List[Dict]]:
-        """Group courses into logical sequences based on title similarity.
+        """Group courses into logical sequences based on document order, role progression, and title similarity.
 
         Args:
-            courses: List of course dictionaries
+            courses: List of course dictionaries (in document order)
 
         Returns:
             Dictionary mapping sequence names to course lists
         """
+        if not courses:
+            return {}
+
         sequences = {}
         used_indices = set()
+
+        # Add document index to preserve order
+        for i, course in enumerate(courses):
+            course['_doc_index'] = i
 
         for i, course in enumerate(courses):
             if i in used_indices:
@@ -183,30 +190,79 @@ class PathwayComparisonGenerator:
             sequence_courses = [course]
             used_indices.add(i)
 
-            # Look for other courses with similar base names
+            # Look for related courses using multiple signals
             for j, other_course in enumerate(courses):
                 if j in used_indices or j == i:
                     continue
 
-                # Check title similarity
+                # Signal 1: High title similarity (same course family)
                 similarity = self._compute_title_similarity(course['title'], other_course['title'])
+                is_similar = similarity >= 0.7
 
-                if similarity >= 0.7:  # High similarity threshold
+                # Signal 2: Sequential in document + compatible roles
+                # (e.g., exploratory followed by concentrator in same domain)
+                is_sequential = abs(j - i) <= 3  # Within 3 positions
+                role_order = ['exploratory', 'gatekeeper', 'concentrator', 'capstone']
+                current_role_idx = role_order.index(course['role']) if course['role'] in role_order else -1
+                other_role_idx = role_order.index(other_course['role']) if other_course['role'] in role_order else -1
+                is_role_progression = (current_role_idx >= 0 and other_role_idx >= 0 and
+                                     other_role_idx >= current_role_idx)
+
+                # Signal 3: Moderate similarity + sequential
+                is_moderate_and_sequential = similarity >= 0.4 and is_sequential
+
+                # Group if any strong signal is present
+                if is_similar or (is_sequential and is_role_progression) or is_moderate_and_sequential:
                     sequence_courses.append(other_course)
                     used_indices.add(j)
 
-            # Sort sequence by sequence number
-            sequence_courses.sort(key=lambda c: self._get_course_sequence(c['title'])[1])
+            # Sort by: sequence number, then role, then document order
+            sequence_courses.sort(key=lambda c: (
+                self._get_course_sequence(c['title'])[1],  # Explicit sequence (I, II, III)
+                {'exploratory': 0, 'gatekeeper': 1, 'concentrator': 2, 'capstone': 3, 'unknown': 4}.get(c['role'], 5),
+                c.get('_doc_index', 999)  # Document order as tiebreaker
+            ))
 
             # Create a sequence name
             if len(sequence_courses) > 1:
-                sequence_name = base_name
+                sequence_name = self._infer_pathway_name(sequence_courses)
             else:
                 sequence_name = course['title']
 
             sequences[sequence_name] = sequence_courses
 
         return sequences
+
+    def _infer_pathway_name(self, courses: List[Dict]) -> str:
+        """Infer a pathway name from a sequence of courses.
+
+        Args:
+            courses: List of courses in the sequence
+
+        Returns:
+            Inferred pathway name
+        """
+        # Try to find common theme from titles
+        first_title = courses[0]['title'].lower()
+
+        # Check for common programming patterns
+        if any(word in first_title for word in ['coding', 'programming', 'python', 'java', 'c++']):
+            # Check if it's a full programming sequence
+            if len(courses) >= 2:
+                return 'Software Development & Programming'
+            return 'Programming'
+
+        # Check for web development
+        if 'web' in first_title:
+            return 'Web Development'
+
+        # Check for digital media/design
+        if any(word in first_title for word in ['design', 'digital', 'image', 'print', 'media']):
+            return 'Digital Media & Design'
+
+        # Fall back to base name of first course
+        base_name, _ = self._get_course_sequence(courses[0]['title'])
+        return base_name
 
     def _extract_current_pathways(self, report: DistrictAnalysisReport) -> List[Dict]:
         """Extract pathway information from the report using intelligent grouping."""
@@ -216,7 +272,7 @@ class PathwayComparisonGenerator:
         pathways = []
         courses = report.landscape.course_inventory
 
-        # Convert to simpler format
+        # Convert to simpler format (preserving document order)
         course_list = [
             {
                 'title': course.title,
@@ -226,7 +282,7 @@ class PathwayComparisonGenerator:
             for course in courses
         ]
 
-        # Group by domain first
+        # Group by domain first (preserve order within domain)
         domain_groups = {}
         for course in course_list:
             domain = course.get('domain', 'Digital Technology')
@@ -236,27 +292,30 @@ class PathwayComparisonGenerator:
 
         # Process each domain group
         for domain, domain_courses in domain_groups.items():
-            # Group courses into sequences within this domain
+            # Group courses into sequences within this domain (respects document order)
             sequences = self._group_into_sequences(domain_courses)
 
             # Create pathways from sequences
             for seq_name, seq_courses in sequences.items():
-                # Determine pathway name
-                pathway_name = self._determine_pathway_name(seq_name, seq_courses)
+                # Determine pathway name (use inferred name if already computed)
+                if len(seq_courses) > 1 and seq_name != seq_courses[0]['title']:
+                    pathway_name = seq_name  # Already inferred by _infer_pathway_name
+                else:
+                    pathway_name = self._determine_pathway_name(seq_name, seq_courses)
 
-                # Sort by sequence number and role
-                seq_courses.sort(key=lambda c: (
-                    self._get_course_sequence(c['title'])[1],  # Sequence number first
-                    {'exploratory': 0, 'gatekeeper': 1, 'concentrator': 2, 'capstone': 3, 'unknown': 4}.get(c['role'], 5)
-                ))
+                # Already sorted in _group_into_sequences, but clean up temp fields
+                for course in seq_courses:
+                    course.pop('_doc_index', None)
 
+                # Show up to 5 courses per pathway (increased from 3)
                 pathways.append({
                     'name': pathway_name,
-                    'courses': seq_courses[:3],  # Limit to first 3 courses
+                    'courses': seq_courses[:5],
                     'color_class': self._get_color_class(pathway_name)
                 })
 
-        return pathways[:4]  # Limit to 4 pathways for visual balance
+        # Show up to 6 pathways (increased from 4)
+        return pathways[:6]
 
     def _determine_pathway_name(self, sequence_name: str, courses: List[Dict]) -> str:
         """Determine a clear pathway name for a sequence of courses.
@@ -320,11 +379,16 @@ class PathwayComparisonGenerator:
             'Programming': 'track-python',
             'Computer Science': 'track-python',
             'Software Development': 'track-python',
+            'Software Development & Programming': 'track-python',
             'Web Development': 'track-web',
             'Networking': 'track-network',
             'IT Support': 'track-network',
             'Digital Design': 'track-design',
             'Digital Media': 'track-design',
+            'Digital Media & Design': 'track-design',
+            'Graphic Design': 'track-design',
+            '3D Modeling & Animation': 'track-design',
+            'Technical Drafting': 'track-design',
             'Cybersecurity': 'track-security',
             'Data Science': 'track-data'
         }
@@ -346,7 +410,13 @@ class PathwayComparisonGenerator:
         # Build pathway tracks
         tracks_html = ""
         num_pathways = len(pathways)
-        grid_cols = 2 if num_pathways <= 4 else 3
+        # Dynamic grid: 2 cols for 2-4 pathways, 3 cols for 5-6, 4 cols for 7+
+        if num_pathways <= 4:
+            grid_cols = 2
+        elif num_pathways <= 6:
+            grid_cols = 3
+        else:
+            grid_cols = 4
 
         for pathway in pathways:
             courses_html = ""
