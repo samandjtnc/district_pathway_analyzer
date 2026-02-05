@@ -2,9 +2,10 @@
 Generate pathway comparison HTML visualization showing before/after with AI Foundations.
 """
 
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple, Set
 
 from district_pathway_analyzer.models import DistrictAnalysisReport
 
@@ -67,62 +68,239 @@ class PathwayComparisonGenerator:
 </html>"""
         return html
 
+    def _extract_base_name(self, title: str) -> str:
+        """Extract the base course name by removing level indicators.
+
+        Args:
+            title: Course title
+
+        Returns:
+            Base course name without level indicators
+        """
+        # Remove common level indicators
+        patterns = [
+            r'\s+[I]+\s*$',  # Roman numerals at end (I, II, III)
+            r'\s+[0-9]+\s*$',  # Arabic numerals at end (1, 2, 3)
+            r'\s+(One|Two|Three|Four)\s*$',  # Word numbers at end
+            r'\s+(Beginning|Intermediate|Advanced)\s*$',  # Level words
+            r'\s+(Intro|Introduction)\s+to\s+',  # Intro prefix
+        ]
+
+        base = title
+        for pattern in patterns:
+            base = re.sub(pattern, '', base, flags=re.IGNORECASE)
+
+        return base.strip()
+
+    def _get_course_sequence(self, title: str) -> Tuple[str, int]:
+        """Get the sequence information from a course title.
+
+        Args:
+            title: Course title
+
+        Returns:
+            Tuple of (base_name, sequence_number)
+        """
+        title_lower = title.lower()
+
+        # Check for Roman numerals
+        roman_map = {'i': 1, 'ii': 2, 'iii': 3, 'iv': 4}
+        for roman, num in roman_map.items():
+            if re.search(rf'\b{roman}\b', title_lower):
+                return (self._extract_base_name(title), num)
+
+        # Check for Arabic numerals
+        match = re.search(r'\b([1-4])\b', title_lower)
+        if match:
+            return (self._extract_base_name(title), int(match.group(1)))
+
+        # Check for word numbers
+        word_map = {'one': 1, 'two': 2, 'three': 3, 'four': 4,
+                    'beginning': 1, 'intermediate': 2, 'advanced': 3}
+        for word, num in word_map.items():
+            if word in title_lower:
+                return (self._extract_base_name(title), num)
+
+        # No sequence found
+        return (title, 0)
+
+    def _compute_title_similarity(self, title1: str, title2: str) -> float:
+        """Compute similarity between two course titles.
+
+        Args:
+            title1: First course title
+            title2: Second course title
+
+        Returns:
+            Similarity score between 0 and 1
+        """
+        # Extract base names
+        base1 = self._extract_base_name(title1).lower()
+        base2 = self._extract_base_name(title2).lower()
+
+        # Exact match
+        if base1 == base2:
+            return 1.0
+
+        # Tokenize into words
+        words1 = set(re.findall(r'\w+', base1))
+        words2 = set(re.findall(r'\w+', base2))
+
+        # Remove common words
+        stop_words = {'and', 'the', 'a', 'an', 'of', 'to', 'in', 'for'}
+        words1 = words1 - stop_words
+        words2 = words2 - stop_words
+
+        if not words1 or not words2:
+            return 0.0
+
+        # Jaccard similarity
+        intersection = len(words1 & words2)
+        union = len(words1 | words2)
+
+        return intersection / union if union > 0 else 0.0
+
+    def _group_into_sequences(self, courses: List[Dict]) -> Dict[str, List[Dict]]:
+        """Group courses into logical sequences based on title similarity.
+
+        Args:
+            courses: List of course dictionaries
+
+        Returns:
+            Dictionary mapping sequence names to course lists
+        """
+        sequences = {}
+        used_indices = set()
+
+        for i, course in enumerate(courses):
+            if i in used_indices:
+                continue
+
+            # Get sequence info for this course
+            base_name, seq_num = self._get_course_sequence(course['title'])
+
+            # Find all related courses in the sequence
+            sequence_courses = [course]
+            used_indices.add(i)
+
+            # Look for other courses with similar base names
+            for j, other_course in enumerate(courses):
+                if j in used_indices or j == i:
+                    continue
+
+                # Check title similarity
+                similarity = self._compute_title_similarity(course['title'], other_course['title'])
+
+                if similarity >= 0.7:  # High similarity threshold
+                    sequence_courses.append(other_course)
+                    used_indices.add(j)
+
+            # Sort sequence by sequence number
+            sequence_courses.sort(key=lambda c: self._get_course_sequence(c['title'])[1])
+
+            # Create a sequence name
+            if len(sequence_courses) > 1:
+                sequence_name = base_name
+            else:
+                sequence_name = course['title']
+
+            sequences[sequence_name] = sequence_courses
+
+        return sequences
+
     def _extract_current_pathways(self, report: DistrictAnalysisReport) -> List[Dict]:
-        """Extract pathway information from the report."""
+        """Extract pathway information from the report using intelligent grouping."""
         if not report.landscape:
             return []
 
         pathways = []
         courses = report.landscape.course_inventory
 
-        # Group courses by pathway
-        pathway_map = {}
-        for course in courses:
-            pathway_name = self._determine_pathway(course.title, course.domain_tags.primary if course.domain_tags else None)
-
-            if pathway_name not in pathway_map:
-                pathway_map[pathway_name] = []
-
-            pathway_map[pathway_name].append({
+        # Convert to simpler format
+        course_list = [
+            {
                 'title': course.title,
                 'role': course.role.value if course.role else 'unknown',
                 'domain': course.domain_tags.primary if course.domain_tags else None
-            })
+            }
+            for course in courses
+        ]
 
-        # Convert to list format
-        for pathway_name, pathway_courses in pathway_map.items():
-            # Sort by role (exploratory -> gatekeeper -> concentrator -> capstone)
-            role_order = {'exploratory': 0, 'gatekeeper': 1, 'concentrator': 2, 'capstone': 3, 'unknown': 4}
-            pathway_courses.sort(key=lambda c: role_order.get(c['role'], 5))
+        # Group by domain first
+        domain_groups = {}
+        for course in course_list:
+            domain = course.get('domain', 'Digital Technology')
+            if domain not in domain_groups:
+                domain_groups[domain] = []
+            domain_groups[domain].append(course)
 
-            pathways.append({
-                'name': pathway_name,
-                'courses': pathway_courses[:3],  # Limit to first 3 courses for display
-                'color_class': self._get_color_class(pathway_name)
-            })
+        # Process each domain group
+        for domain, domain_courses in domain_groups.items():
+            # Group courses into sequences within this domain
+            sequences = self._group_into_sequences(domain_courses)
+
+            # Create pathways from sequences
+            for seq_name, seq_courses in sequences.items():
+                # Determine pathway name
+                pathway_name = self._determine_pathway_name(seq_name, seq_courses)
+
+                # Sort by sequence number and role
+                seq_courses.sort(key=lambda c: (
+                    self._get_course_sequence(c['title'])[1],  # Sequence number first
+                    {'exploratory': 0, 'gatekeeper': 1, 'concentrator': 2, 'capstone': 3, 'unknown': 4}.get(c['role'], 5)
+                ))
+
+                pathways.append({
+                    'name': pathway_name,
+                    'courses': seq_courses[:3],  # Limit to first 3 courses
+                    'color_class': self._get_color_class(pathway_name)
+                })
 
         return pathways[:4]  # Limit to 4 pathways for visual balance
 
-    def _determine_pathway(self, course_title: str, primary_domain: str) -> str:
-        """Determine which pathway a course belongs to based on title and domain."""
-        title_lower = course_title.lower()
+    def _determine_pathway_name(self, sequence_name: str, courses: List[Dict]) -> str:
+        """Determine a clear pathway name for a sequence of courses.
 
-        # Check for specific keywords in title
-        if 'python' in title_lower or 'java' in title_lower or 'c++' in title_lower:
+        Args:
+            sequence_name: Base name of the course sequence
+            courses: List of courses in the sequence
+
+        Returns:
+            Human-readable pathway name
+        """
+        # Use the sequence name if it's already descriptive
+        if len(courses) > 1:
+            # Multiple courses - use the base name
+            return sequence_name
+
+        # Single course - use more specific categorization
+        title_lower = courses[0]['title'].lower()
+
+        # Check for highly specific patterns first (more specific = higher priority)
+        if '3d' in title_lower and ('modeling' in title_lower or 'animation' in title_lower):
+            return '3D Modeling & Animation'
+        elif 'drafting' in title_lower or 'cad' in title_lower or 'technical drawing' in title_lower:
+            return 'Technical Drafting'
+        elif 'python' in title_lower or 'java' in title_lower or 'c++' in title_lower:
             return 'Programming'
         elif 'web' in title_lower and ('design' in title_lower or 'development' in title_lower):
             return 'Web Development'
         elif 'network' in title_lower or 'cisco' in title_lower or 'ccna' in title_lower:
             return 'Networking'
-        elif 'design' in title_lower or 'graphics' in title_lower or 'media' in title_lower:
-            return 'Digital Design'
         elif 'cyber' in title_lower or 'security' in title_lower:
             return 'Cybersecurity'
-        elif 'data' in title_lower or 'database' in title_lower:
+        elif 'data' in title_lower and ('science' in title_lower or 'analytics' in title_lower):
             return 'Data Science'
+        elif 'game' in title_lower and ('design' in title_lower or 'development' in title_lower):
+            return 'Game Development'
+        elif 'video' in title_lower or 'film' in title_lower or 'production' in title_lower:
+            return 'Video Production'
+        elif 'graphic' in title_lower or ('digital' in title_lower and 'design' in title_lower):
+            return 'Graphic Design'
 
-        # Fall back to domain
-        if primary_domain:
+        # Fall back to domain if available
+        domain = courses[0].get('domain')
+        if domain:
             domain_map = {
                 'computer_science': 'Computer Science',
                 'software_development': 'Software Development',
@@ -132,9 +310,9 @@ class PathwayComparisonGenerator:
                 'digital_media': 'Digital Media',
                 'it_support': 'IT Support'
             }
-            return domain_map.get(primary_domain, 'Digital Technology')
+            return domain_map.get(domain, sequence_name)
 
-        return 'Digital Technology'
+        return sequence_name
 
     def _get_color_class(self, pathway_name: str) -> str:
         """Get CSS color class for a pathway."""
