@@ -247,7 +247,7 @@ class PathwayComparisonGenerator:
                 <div class="informed-track">
                     <div class="informed-track-title">{pathway['name']}</div>
                     {courses_html}
-                    <div style="text-align: center; font-size: 10px; color: #0369A1; margin-top: 6px; font-style: italic;">
+                    <div style="text-align: center; font-size: 10px; color: #0093A4; margin-top: 6px; font-style: italic;">
                         ✓ {benefit_text}
                     </div>
                 </div>
@@ -444,12 +444,12 @@ class PathwayComparisonGenerator:
         }
 
         .current-state {
-            background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
-            border: 4px solid #DC2626;
+            background: linear-gradient(135deg, rgba(237, 96, 96, 0.1) 0%, rgba(237, 96, 96, 0.15) 100%);
+            border: 4px solid #ED6060;
         }
 
         .designed-state {
-            background: linear-gradient(135deg, #F0F9FF 0%, #DBEAFE 100%);
+            background: linear-gradient(135deg, rgba(0, 147, 164, 0.05) 0%, rgba(0, 147, 164, 0.1) 100%);
             border: 4px solid #0093A4;
         }
 
@@ -464,7 +464,7 @@ class PathwayComparisonGenerator:
         }
 
         .current-state .section-header {
-            color: #DC2626;
+            color: #ED6060;
         }
 
         .designed-state .section-header {
@@ -479,12 +479,12 @@ class PathwayComparisonGenerator:
         }
 
         .current-state .status-badge {
-            background: #DC2626;
+            background: #ED6060;
             color: white;
         }
 
         .designed-state .status-badge {
-            background: #10B981;
+            background: #0093A4;
             color: white;
         }
 
@@ -495,11 +495,11 @@ class PathwayComparisonGenerator:
         }
 
         .current-state .section-subtitle {
-            color: #991B1B;
+            color: #ED6060;
         }
 
         .designed-state .section-subtitle {
-            color: #0369A1;
+            color: #0093A4;
         }
 
         .parallel-tracks {
@@ -510,7 +510,7 @@ class PathwayComparisonGenerator:
 
         .track {
             background: white;
-            border: 3px solid #FCA5A5;
+            border: 3px solid rgba(237, 96, 96, 0.4);
             border-radius: 12px;
             padding: 16px;
         }
@@ -519,7 +519,7 @@ class PathwayComparisonGenerator:
             font-family: 'Barlow Semi Condensed', sans-serif;
             font-size: 14px;
             font-weight: 600;
-            color: #DC2626;
+            color: #ED6060;
             text-align: center;
             margin-bottom: 12px;
             text-transform: uppercase;
@@ -537,39 +537,39 @@ class PathwayComparisonGenerator:
         }
 
         .track-python .course-box, .course-box.track-python {
-            background: #DBEAFE;
-            border: 2px solid #3B82F6;
-            color: #1E3A8A;
+            background: rgba(0, 147, 164, 0.15);
+            border: 2px solid #0093A4;
+            color: #0093A4;
         }
 
         .track-design .course-box, .course-box.track-design {
-            background: #FCE7F3;
-            border: 2px solid #EC4899;
-            color: #831843;
+            background: rgba(140, 82, 186, 0.15);
+            border: 2px solid #8C52BA;
+            color: #8C52BA;
         }
 
         .track-network .course-box, .course-box.track-network {
-            background: #FEF3C7;
-            border: 2px solid #F59E0B;
-            color: #78350F;
+            background: rgba(0, 255, 245, 0.2);
+            border: 2px solid #00FFF5;
+            color: #0093A4;
         }
 
         .track-web .course-box, .course-box.track-web {
-            background: #D1FAE5;
-            border: 2px solid #10B981;
-            color: #064E3B;
+            background: rgba(140, 82, 186, 0.1);
+            border: 2px solid #8C52BA;
+            color: #8C52BA;
         }
 
         .track-security .course-box, .course-box.track-security {
-            background: #FEE2E2;
-            border: 2px solid #EF4444;
-            color: #7F1D1D;
+            background: rgba(237, 96, 96, 0.15);
+            border: 2px solid #ED6060;
+            color: #ED6060;
         }
 
         .track-data .course-box, .course-box.track-data {
-            background: #E0E7FF;
-            border: 2px solid #6366F1;
-            color: #312E81;
+            background: rgba(0, 147, 164, 0.1);
+            border: 2px solid #0093A4;
+            color: #0093A4;
         }
 
         .course-arrow {
@@ -580,8 +580,8 @@ class PathwayComparisonGenerator:
         }
 
         .confusion-box {
-            background: #FEE2E2;
-            border: 3px dashed #DC2626;
+            background: rgba(237, 96, 96, 0.1);
+            border: 3px dashed #ED6060;
             border-radius: 12px;
             padding: 20px;
             text-align: center;
@@ -592,13 +592,13 @@ class PathwayComparisonGenerator:
             font-family: 'Barlow Semi Condensed', sans-serif;
             font-size: 18px;
             font-weight: 600;
-            color: #991B1B;
+            color: #ED6060;
             margin-bottom: 8px;
         }
 
         .confusion-text {
             font-size: 13px;
-            color: #7F1D1D;
+            color: #292F36;
             line-height: 1.5;
         }
 
@@ -625,7 +625,7 @@ class PathwayComparisonGenerator:
 
         .entry-course-subtitle {
             font-size: 14px;
-            color: #0F766E;
+            color: #0093A4;
             font-weight: 600;
         }
 
@@ -635,7 +635,7 @@ class PathwayComparisonGenerator:
             gap: 8px;
             margin-top: 16px;
             padding-top: 16px;
-            border-top: 2px solid #14B8A6;
+            border-top: 2px solid #0093A4;
         }
 
         .topic-badge {
@@ -644,7 +644,7 @@ class PathwayComparisonGenerator:
             border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
-            color: #0F766E;
+            color: #0093A4;
             text-align: center;
         }
 
@@ -682,7 +682,7 @@ class PathwayComparisonGenerator:
             font-family: 'Barlow Semi Condensed', sans-serif;
             font-size: 12px;
             font-weight: 600;
-            color: #0369A1;
+            color: #0093A4;
             text-align: center;
             margin-bottom: 8px;
             text-transform: uppercase;
@@ -707,7 +707,7 @@ class PathwayComparisonGenerator:
 
         .problem-box {
             background: #FFFFFF;
-            border: 3px solid #DC2626;
+            border: 3px solid #ED6060;
             border-radius: 12px;
             padding: 20px;
             margin-top: 20px;
@@ -717,7 +717,7 @@ class PathwayComparisonGenerator:
             font-family: 'Barlow Semi Condensed', sans-serif;
             font-size: 18px;
             font-weight: 600;
-            color: #DC2626;
+            color: #ED6060;
             margin-bottom: 12px;
             display: flex;
             align-items: center;
@@ -737,7 +737,7 @@ class PathwayComparisonGenerator:
 
         .benefit-box {
             background: #FFFFFF;
-            border: 3px solid #10B981;
+            border: 3px solid #0093A4;
             border-radius: 12px;
             padding: 20px;
             margin-top: 20px;
@@ -747,7 +747,7 @@ class PathwayComparisonGenerator:
             font-family: 'Barlow Semi Condensed', sans-serif;
             font-size: 18px;
             font-weight: 600;
-            color: #10B981;
+            color: #0093A4;
             margin-bottom: 12px;
             display: flex;
             align-items: center;
@@ -766,7 +766,7 @@ class PathwayComparisonGenerator:
         }
 
         .impact-section {
-            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%);
+            background: linear-gradient(135deg, rgba(0, 147, 164, 0.05) 0%, rgba(0, 147, 164, 0.1) 100%);
             border: 4px solid #0093A4;
             border-radius: 16px;
             padding: 40px;
@@ -800,11 +800,11 @@ class PathwayComparisonGenerator:
         }
 
         .impact-column.before .impact-column-title {
-            color: #DC2626;
+            color: #ED6060;
         }
 
         .impact-column.after .impact-column-title {
-            color: #10B981;
+            color: #0093A4;
         }
 
         .impact-text {
