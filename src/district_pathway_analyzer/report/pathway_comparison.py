@@ -124,12 +124,14 @@ class PathwayComparisonGenerator:
         # No sequence found
         return (title, 0)
 
-    def _compute_title_similarity(self, title1: str, title2: str) -> float:
-        """Compute similarity between two course titles.
+    def _compute_title_similarity(self, title1: str, title2: str, desc1: str = None, desc2: str = None) -> float:
+        """Compute similarity between two course titles, optionally using descriptions.
 
         Args:
             title1: First course title
             title2: Second course title
+            desc1: Optional description for first course
+            desc2: Optional description for second course
 
         Returns:
             Similarity score between 0 and 1
@@ -146,8 +148,17 @@ class PathwayComparisonGenerator:
         words1 = set(re.findall(r'\w+', base1))
         words2 = set(re.findall(r'\w+', base2))
 
+        # If descriptions available, add description words for richer comparison
+        if desc1 and desc2:
+            desc_words1 = set(re.findall(r'\w+', desc1.lower()))
+            desc_words2 = set(re.findall(r'\w+', desc2.lower()))
+            # Add description words (they'll help with similarity but titles still weighted more)
+            words1 = words1.union(desc_words1)
+            words2 = words2.union(desc_words2)
+
         # Remove common words
-        stop_words = {'and', 'the', 'a', 'an', 'of', 'to', 'in', 'for'}
+        stop_words = {'and', 'the', 'a', 'an', 'of', 'to', 'in', 'for', 'with', 'will', 'students',
+                     'learn', 'course', 'class', 'this', 'that', 'from', 'using', 'use'}
         words1 = words1 - stop_words
         words2 = words2 - stop_words
 
@@ -197,7 +208,11 @@ class PathwayComparisonGenerator:
                     continue
 
                 # Signal 1: High title similarity (same course family)
-                similarity = self._compute_title_similarity(course['title'], other_course['title'])
+                # Use descriptions if available for richer comparison
+                similarity = self._compute_title_similarity(
+                    course['title'], other_course['title'],
+                    course.get('description'), other_course.get('description')
+                )
                 is_similar = similarity >= 0.7
 
                 # Signal 2: Sequential in document + compatible roles + MINIMUM similarity
@@ -326,7 +341,10 @@ class PathwayComparisonGenerator:
 
             # Keep course if it shares keywords OR has high similarity with ANY course in group
             max_similarity = max(
-                self._compute_title_similarity(course['title'], coherent_course['title'])
+                self._compute_title_similarity(
+                    course['title'], coherent_course['title'],
+                    course.get('description'), coherent_course.get('description')
+                )
                 for coherent_course in coherent_courses
             )
 
@@ -384,7 +402,8 @@ class PathwayComparisonGenerator:
             {
                 'title': course.title,
                 'role': course.role.value if course.role else 'unknown',
-                'domain': course.domain_tags.primary if course.domain_tags else None
+                'domain': course.domain_tags.primary if course.domain_tags else None,
+                'description': course.description if course.description else None
             }
             for course in courses
         ]

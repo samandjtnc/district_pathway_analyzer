@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central School District: Before and After AI Foundations</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Figtree', sans-serif;
+            background: #FFFFFF;
+            padding: 40px;
+            min-height: 100vh;
+        }
+        
+        .main-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 42px;
+            font-weight: 600;
+            color: #292F36;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #6B7280;
+            text-align: center;
+            margin-bottom: 50px;
+            font-style: italic;
+        }
+        
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .pathway-section {
+            border-radius: 16px;
+            padding: 30px;
+            position: relative;
+            min-height: 800px;
+        }
+        
+        .current-state {
+            background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+            border: 4px solid #DC2626;
+        }
+        
+        .designed-state {
+            background: linear-gradient(135deg, #F0F9FF 0%, #DBEAFE 100%);
+            border: 4px solid #0093A4;
+        }
+        
+        .section-header {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 34px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .current-state .section-header {
+            color: #DC2626;
+        }
+        
+        .designed-state .section-header {
+            color: #0093A4;
+        }
+        
+        .status-badge {
+            font-size: 16px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .current-state .status-badge {
+            background: #DC2626;
+            color: white;
+        }
+        
+        .designed-state .status-badge {
+            background: #10B981;
+            color: white;
+        }
+        
+        .section-subtitle {
+            font-size: 14px;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        
+        .current-state .section-subtitle {
+            color: #991B1B;
+        }
+        
+        .designed-state .section-subtitle {
+            color: #0369A1;
+        }
+        
+        /* Current State: Parallel Silos */
+        .parallel-tracks {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .track {
+            background: white;
+            border: 3px solid #FCA5A5;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        
+        .track-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #DC2626;
+            text-align: center;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .course-box {
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .track-python .course-box {
+            background: #DBEAFE;
+            border: 2px solid #3B82F6;
+            color: #1E3A8A;
+        }
+        
+        .track-design .course-box {
+            background: #FCE7F3;
+            border: 2px solid #EC4899;
+            color: #831843;
+        }
+        
+        .track-network .course-box {
+            background: #FEF3C7;
+            border: 2px solid #F59E0B;
+            color: #78350F;
+        }
+        
+        .track-web .course-box {
+            background: #D1FAE5;
+            border: 2px solid #10B981;
+            color: #064E3B;
+        }
+        
+        .course-arrow {
+            text-align: center;
+            color: #9CA3AF;
+            font-size: 16px;
+            margin: 4px 0;
+        }
+        
+        .confusion-box {
+            background: #FEE2E2;
+            border: 3px dashed #DC2626;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .confusion-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #991B1B;
+            margin-bottom: 8px;
+        }
+        
+        .confusion-text {
+            font-size: 13px;
+            color: #7F1D1D;
+            line-height: 1.5;
+        }
+        
+        /* Designed State: Funnel */
+        .entry-point {
+            margin-bottom: 30px;
+        }
+        
+        .entry-course {
+            background: linear-gradient(135deg, #00FFF5 0%, #00D9D0 100%);
+            border: 4px solid #00D9D0;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 255, 245, 0.3);
+        }
+        
+        .entry-course-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 28px;
+            font-weight: 600;
+            color: #292F36;
+            margin-bottom: 8px;
+        }
+        
+        .entry-course-subtitle {
+            font-size: 14px;
+            color: #0F766E;
+            font-weight: 600;
+        }
+        
+        .exploration-topics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px solid #14B8A6;
+        }
+        
+        .topic-badge {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #0F766E;
+            text-align: center;
+        }
+        
+        .big-arrow {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .big-arrow-text {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #0093A4;
+            margin-bottom: 8px;
+        }
+        
+        .big-arrow-icon {
+            font-size: 36px;
+            color: #0093A4;
+        }
+        
+        .informed-tracks {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .informed-track {
+            background: white;
+            border: 3px solid #0093A4;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        
+        .informed-track-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: #0369A1;
+            text-align: center;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .informed-track .course-box {
+            font-size: 12px;
+            padding: 8px 10px;
+        }
+        
+        .grade-label {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #6B7280;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 0;
+            border-bottom: 2px solid #E5E7EB;
+        }
+        
+        .problem-box {
+            background: #FFFFFF;
+            border: 3px solid #DC2626;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .problem-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #DC2626;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .problem-list {
+            font-size: 13px;
+            color: #292F36;
+            line-height: 1.8;
+        }
+        
+        .problem-list li {
+            margin-bottom: 8px;
+            padding-left: 8px;
+        }
+        
+        .benefit-box {
+            background: #FFFFFF;
+            border: 3px solid #10B981;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .benefit-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #10B981;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .benefit-list {
+            font-size: 13px;
+            color: #292F36;
+            line-height: 1.8;
+        }
+        
+        .benefit-list li {
+            margin-bottom: 8px;
+            padding-left: 8px;
+        }
+        
+        .impact-section {
+            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%);
+            border: 4px solid #0093A4;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .impact-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 32px;
+            font-weight: 600;
+            color: #0093A4;
+            margin-bottom: 20px;
+        }
+        
+        .impact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .impact-column {
+            text-align: left;
+        }
+        
+        .impact-column-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .impact-column.before .impact-column-title {
+            color: #DC2626;
+        }
+        
+        .impact-column.after .impact-column-title {
+            color: #10B981;
+        }
+        
+        .impact-text {
+            font-size: 14px;
+            color: #292F36;
+            line-height: 1.8;
+        }
+        
+        .logo {
+            text-align: right;
+            margin-top: 30px;
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 14px;
+            color: #6B7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-title">Central School District Digital Technology Pathways</div>
+    <div class="subtitle">Current parallel silos vs. designed entry point with AI Foundations</div>
+    
+    <div class="comparison-container">
+        <!-- CURRENT STATE - PARALLEL SILOS -->
+        <div class="pathway-section current-state">
+            <div class="section-header">
+                <span>Current State</span>
+                <span class="status-badge">⚠️ PROBLEM</span>
+            </div>
+            <div class="section-subtitle">Parallel silos - students forced to specialize immediately</div>
+            
+            <div class="grade-label">Grade 9: Choose Your Track (No Exploration)</div>
+            
+            <div class="confusion-box">
+                <div class="confusion-title">😕 Students face 4 narrow entry points with no context</div>
+                <div class="confusion-text">
+                    "Which track is right for me? What's the difference between Python and Web Design? 
+                    What if I want to do AI or cybersecurity? I guess I'll just pick Python..."
+                </div>
+            </div>
+            
+            <div class="parallel-tracks">
+                <!-- Python Track -->
+                <div class="track track-python">
+                    <div class="track-title">Python Track</div>
+                    <div class="course-box">Introduction to Python</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box">Python II</div>
+                    <div style="text-align: center; font-size: 11px; color: #6B7280; margin-top: 8px; font-style: italic;">
+                        Coding only, no systems/networks/AI context
+                    </div>
+                </div>
+                
+                <!-- Visual Design Track -->
+                <div class="track track-design">
+                    <div class="track-title">Visual Design Track</div>
+                    <div class="course-box">Visual Design I</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box">Visual Design II</div>
+                    <div style="text-align: center; font-size: 11px; color: #6B7280; margin-top: 8px; font-style: italic;">
+                        Graphics focus, limited tech depth
+                    </div>
+                </div>
+                
+                <!-- Network Engineering Track -->
+                <div class="track track-network">
+                    <div class="track-title">Network Track</div>
+                    <div class="course-box">Network Engineering I</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box">Network Engineering II</div>
+                    <div style="text-align: center; font-size: 11px; color: #6B7280; margin-top: 8px; font-style: italic;">
+                        Infrastructure only, no programming
+                    </div>
+                </div>
+                
+                <!-- Web Design Track -->
+                <div class="track track-web">
+                    <div class="track-title">Web Design Track</div>
+                    <div class="course-box">Introduction to Web Design</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box">Advanced Web Design</div>
+                    <div style="text-align: center; font-size: 11px; color: #6B7280; margin-top: 8px; font-style: italic;">
+                        Front-end only, no back-end/data
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Problems -->
+            <div class="problem-box">
+                <div class="problem-title">
+                    <span>⚠️</span>
+                    <span>Critical Problems:</span>
+                </div>
+                <ul class="problem-list">
+                    <li><strong>❌ Premature specialization</strong> - Students locked into narrow tracks before understanding the field</li>
+                    <li><strong>❌ No shared foundation</strong> - Missing cross-cutting concepts (AI, data, systems thinking)</li>
+                    <li><strong>❌ Parallel silos</strong> - Four separate entry points create confusion and fragmentation</li>
+                    <li><strong>❌ Limited switching</strong> - Hard to change tracks once started (Python → Design requires starting over)</li>
+                    <li><strong>❌ Missing modern topics</strong> - No exposure to AI, machine learning, data science, or cybersecurity</li>
+                    <li><strong>❌ Student confusion</strong> - "How do I know which track is right if I haven't tried any?"</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- DESIGNED STATE - FUNNEL WITH AI FOUNDATIONS -->
+        <div class="pathway-section designed-state">
+            <div class="section-header">
+                <span>Designed State</span>
+                <span class="status-badge">✅ SOLUTION</span>
+            </div>
+            <div class="section-subtitle">Funnel design - exploration before specialization</div>
+            
+            <div class="grade-label">Grade 9: Shared Entry Point (Broad Exploration)</div>
+            
+            <!-- Entry Point -->
+            <div class="entry-point">
+                <div class="entry-course">
+                    <div class="entry-course-title">🤖 AI Foundations</div>
+                    <div class="entry-course-subtitle">Every student explores the breadth of digital technology</div>
+                    
+                    <div class="exploration-topics">
+                        <div class="topic-badge">🧠 Artificial Intelligence</div>
+                        <div class="topic-badge">🐍 Python Programming</div>
+                        <div class="topic-badge">💻 Computer Systems</div>
+                        <div class="topic-badge">🌐 Networks</div>
+                        <div class="topic-badge">🔒 Cybersecurity</div>
+                        <div class="topic-badge">📊 Data Science</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="big-arrow">
+                <div class="big-arrow-text">Students now make INFORMED choices</div>
+                <div class="big-arrow-icon">↓</div>
+            </div>
+            
+            <div class="grade-label">Grades 10-12: Choose Your Specialization (With Context)</div>
+            
+            <div class="informed-tracks">
+                <!-- Python Track -->
+                <div class="informed-track">
+                    <div class="informed-track-title">Python Track</div>
+                    <div class="course-box track-python">Introduction to Python</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box track-python">Python II</div>
+                    <div style="text-align: center; font-size: 10px; color: #0369A1; margin-top: 6px; font-style: italic;">
+                        ✓ Already learned basics in AI Foundations
+                    </div>
+                </div>
+                
+                <!-- Visual Design Track -->
+                <div class="informed-track">
+                    <div class="informed-track-title">Visual Design Track</div>
+                    <div class="course-box track-design">Visual Design I</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box track-design">Visual Design II</div>
+                    <div style="text-align: center; font-size: 10px; color: #0369A1; margin-top: 6px; font-style: italic;">
+                        ✓ Understands how design connects to tech
+                    </div>
+                </div>
+                
+                <!-- Network Engineering Track -->
+                <div class="informed-track">
+                    <div class="informed-track-title">Network Track</div>
+                    <div class="course-box track-network">Network Engineering I</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box track-network">Network Engineering II</div>
+                    <div style="text-align: center; font-size: 10px; color: #0369A1; margin-top: 6px; font-style: italic;">
+                        ✓ Already explored networks & cyber
+                    </div>
+                </div>
+                
+                <!-- Web Design Track -->
+                <div class="informed-track">
+                    <div class="informed-track-title">Web Design Track</div>
+                    <div class="course-box track-web">Introduction to Web Design</div>
+                    <div class="course-arrow">↓</div>
+                    <div class="course-box track-web">Advanced Web Design</div>
+                    <div style="text-align: center; font-size: 10px; color: #0369A1; margin-top: 6px; font-style: italic;">
+                        ✓ Knows Python, can build back-end too
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Benefits -->
+            <div class="benefit-box">
+                <div class="benefit-title">
+                    <span>✅</span>
+                    <span>Transformative Benefits:</span>
+                </div>
+                <ul class="benefit-list">
+                    <li><strong>✅ Informed choice</strong> - Students explore before specializing, choose with confidence</li>
+                    <li><strong>✅ Shared foundation</strong> - All students get AI, data, systems, networks, cybersecurity basics</li>
+                    <li><strong>✅ Single clear entry</strong> - One obvious starting point eliminates confusion</li>
+                    <li><strong>✅ Flexible pathways</strong> - Students can switch tracks with foundation intact</li>
+                    <li><strong>✅ Modern skills</strong> - Early exposure to AI, ML, data science throughout career</li>
+                    <li><strong>✅ All tracks preserved</strong> - Every existing course remains, just better-prepared students</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Impact Section -->
+    <div class="impact-section">
+        <div class="impact-title">The Transformation: Same Courses, Radically Different Student Experience</div>
+        
+        <div class="impact-grid">
+            <div class="impact-column before">
+                <div class="impact-column-title">❌ Before: Parallel Silos</div>
+                <div class="impact-text">
+                    <strong>Student at Grade 9:</strong> "I have to pick between Python, Design, Networks, or Web. I don't know what any of these really are. My friend likes coding, so I guess I'll do Python too..."
+                    <br><br>
+                    <strong>Student at Grade 11:</strong> "I hate just writing code. I wish I'd known about cybersecurity or AI. But I'm two years into Python—too late to switch now."
+                    <br><br>
+                    <strong>Result:</strong> Accidental pathways, narrow skills, student frustration, high course-switching.
+                </div>
+            </div>
+            
+            <div class="impact-column after">
+                <div class="impact-column-title">✅ After: Exploration → Choice</div>
+                <div class="impact-text">
+                    <strong>Student at Grade 9:</strong> "In AI Foundations, I'm learning Python, networks, data, AI, cybersecurity. I love the network security stuff—that's my thing!"
+                    <br><br>
+                    <strong>Student at Grade 11:</strong> "I chose Network Engineering because I discovered I love it in grade 9. And I can still use my Python skills to automate networks. I know where I'm headed."
+                    <br><br>
+                    <strong>Result:</strong> Confident choices, well-rounded skills, student engagement, clear career paths.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="logo">code.org | Central School District Pathway Analysis</div>
+</body>
+</html>

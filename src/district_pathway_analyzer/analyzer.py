@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from district_pathway_analyzer.alignment import AlignmentAnalyzer
 from district_pathway_analyzer.config import get_config
+from district_pathway_analyzer.description_generator import DescriptionGenerator
 from district_pathway_analyzer.design import PathwayDesignEngine
 from district_pathway_analyzer.discovery import (
     CourseExtractor,
@@ -39,6 +40,7 @@ class DistrictPathwayAnalyzer:
         self.config = get_config()
         self.discoverer = DistrictDiscoverer()
         self.extractor = CourseExtractor()
+        self.description_generator = DescriptionGenerator()
         self.tagger = DomainTagger()
         self.landscape_modeler = LandscapeModeler()
         self.alignment_analyzer = AlignmentAnalyzer()
@@ -90,6 +92,19 @@ class DistrictPathwayAnalyzer:
                 logger.warning("Discovery gate failed")
                 report.errors.append("Discovery gate failed - insufficient data")
                 return report
+
+            # Phase 0.5: Description Enrichment (optional, for better analysis)
+            logger.info("Phase 0.5: Description Enrichment")
+            enriched_courses = self.description_generator.enrich_courses(inventory.courses)
+            inventory.courses = enriched_courses
+
+            # Log generation stats
+            stats = self.description_generator.get_generation_stats()
+            if stats["descriptions_generated"] > 0:
+                logger.info(
+                    f"Generated {stats['descriptions_generated']} course descriptions "
+                    f"using {stats['model_used']}"
+                )
 
             report.current_phase = "tagging"
 
