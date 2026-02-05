@@ -399,6 +399,57 @@
             background: #e2e8f0;
         }
 
+        .download-btn {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            padding: 0.875rem 1.75rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-right: 1rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .download-btn:hover {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+        }
+
+        .download-btn-comparison {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.875rem 1.75rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-right: 1rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .download-btn-comparison:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
         footer {
             text-align: center;
             padding: 2rem;
@@ -800,7 +851,15 @@
             }
 
             html += `
-                    <button class="reset-btn" onclick="resetForm()">Analyze Another District</button>
+                    <div class="action-buttons">
+                        <a href="/api/download/${currentJobId}" class="download-btn" download>
+                            <span>📄</span> Download Full Report (Markdown)
+                        </a>
+                        <a href="/api/view-comparison/${currentJobId}" class="download-btn-comparison" target="_blank">
+                            <span>🔀</span> View Pathway Comparison
+                        </a>
+                        <button class="reset-btn" onclick="resetForm()">Analyze Another District</button>
+                    </div>
                 </div>
             `;
 

@@ -20,6 +20,8 @@ from pydantic import BaseModel
 
 from district_pathway_analyzer.analyzer import DistrictPathwayAnalyzer
 from district_pathway_analyzer.models import PipelineStatus
+from district_pathway_analyzer.report.generator import ReportGenerator
+from district_pathway_analyzer.report.pathway_comparison import PathwayComparisonGenerator
 
 # Load environment variables
 load_dotenv()
@@ -51,6 +53,10 @@ analysis_jobs: Dict[str, dict] = {}
 WEB_DIR = Path(__file__).parent
 STATIC_DIR = WEB_DIR / "static"
 TEMPLATES_DIR = WEB_DIR / "templates"
+
+# Reports directory (outside of package, in working directory)
+REPORTS_DIR = Path("reports")
+REPORTS_DIR.mkdir(exist_ok=True)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -219,6 +225,27 @@ def run_analysis_task(
                     "validation_needed": report.design.validation_needed,
                 }
 
+            # Generate markdown report
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            base_filename = f"{district_name.replace(' ', '_')}_{state.replace(' ', '_')}_{timestamp}"
+
+            markdown_filename = f"{base_filename}.md"
+            markdown_path = REPORTS_DIR / markdown_filename
+
+            report_generator = ReportGenerator()
+            report_generator.generate(report, str(markdown_path), format="markdown")
+
+            # Generate pathway comparison HTML
+            comparison_filename = f"{base_filename}_pathway_comparison.html"
+            comparison_path = REPORTS_DIR / comparison_filename
+
+            comparison_generator = PathwayComparisonGenerator()
+            comparison_generator.generate(report, str(comparison_path))
+
+            # Store file paths in result
+            result["markdown_file"] = markdown_filename
+            result["comparison_html_file"] = comparison_filename
+
             analysis_jobs[job_id]["status"] = "completed"
             analysis_jobs[job_id]["progress"] = "Analysis complete"
             analysis_jobs[job_id]["result"] = result
@@ -252,6 +279,58 @@ async def get_status(job_id: str):
         result=job["result"],
         error=job["error"],
     )
+
+
+@app.get("/api/download/{job_id}")
+async def download_report(job_id: str):
+    """Download the full markdown report for a completed analysis."""
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = analysis_jobs[job_id]
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Analysis not completed")
+
+    if not job["result"] or "markdown_file" not in job["result"]:
+        raise HTTPException(status_code=404, detail="Report not available")
+
+    markdown_filename = job["result"]["markdown_file"]
+    markdown_path = REPORTS_DIR / markdown_filename
+
+    if not markdown_path.exists():
+        raise HTTPException(status_code=404, detail="Report file not found")
+
+    return FileResponse(
+        path=str(markdown_path),
+        filename=markdown_filename,
+        media_type="text/markdown",
+    )
+
+
+@app.get("/api/view-comparison/{job_id}")
+async def view_comparison(job_id: str):
+    """View the pathway comparison HTML visualization in browser."""
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = analysis_jobs[job_id]
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Analysis not completed")
+
+    if not job["result"] or "comparison_html_file" not in job["result"]:
+        raise HTTPException(status_code=404, detail="Comparison not available")
+
+    comparison_filename = job["result"]["comparison_html_file"]
+    comparison_path = REPORTS_DIR / comparison_filename
+
+    if not comparison_path.exists():
+        raise HTTPException(status_code=404, detail="Comparison file not found")
+
+    # Read and return HTML content directly for inline viewing
+    with open(comparison_path, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+
+    return HTMLResponse(content=html_content)
 
 
 @app.get("/api/health")
