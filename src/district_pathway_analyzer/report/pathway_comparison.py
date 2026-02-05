@@ -263,7 +263,11 @@ class PathwayComparisonGenerator:
             Filtered list of courses that are topically coherent
         """
         if len(courses) <= 2:
-            return courses  # Keep small sequences together
+            return courses  # Keep small sequences together - trust initial grouping
+
+        # For sequences of 3-4 courses, be lenient (only split if very different)
+        # For sequences of 5+, be more strict
+        is_small_sequence = len(courses) <= 4
 
         # Extract meaningful keywords from all titles (excluding stop words and common CTE terms)
         def get_topic_keywords(title: str) -> Set[str]:
@@ -271,7 +275,27 @@ class PathwayComparisonGenerator:
             stop_words = {'intro', 'introduction', 'to', 'and', 'the', 'a', 'an', 'of',
                          'in', 'for', 'i', 'ii', 'iii', 'iv', '1', '2', '3', '4',
                          'beginning', 'intermediate', 'advanced', 'one', 'two', 'three'}
-            return words - stop_words
+
+            # Expand with semantic equivalents for CTE domains
+            semantic_expansions = {
+                'coding': {'programming', 'code', 'coding', 'development', 'software'},
+                'programming': {'programming', 'code', 'coding', 'development', 'software'},
+                'python': {'programming', 'code', 'coding', 'python'},
+                'java': {'programming', 'code', 'coding', 'java'},
+                'web': {'web', 'website', 'internet', 'online'},
+                'design': {'design', 'designing', 'designer'},
+                'digital': {'digital', 'computer', 'electronic'},
+                'print': {'print', 'printing', 'graphic', 'publishing'},
+                'image': {'image', 'photo', 'picture', 'graphic', 'visual'},
+                'edit': {'edit', 'editing', 'editor', 'manipulation'},
+            }
+
+            expanded_words = words - stop_words
+            for word in list(expanded_words):
+                if word in semantic_expansions:
+                    expanded_words.update(semantic_expansions[word])
+
+            return expanded_words
 
         # Get keywords from first course (the anchor)
         anchor_keywords = get_topic_keywords(courses[0]['title'])
@@ -306,7 +330,11 @@ class PathwayComparisonGenerator:
                 for coherent_course in coherent_courses
             )
 
-            if shared_keywords or course_shared_with_group or max_similarity >= 0.5:
+            # For small sequences (3-4 courses), use lower threshold
+            # For larger sequences (5+), be stricter
+            similarity_threshold = 0.3 if is_small_sequence else 0.5
+
+            if shared_keywords or course_shared_with_group or max_similarity >= similarity_threshold:
                 coherent_courses.append(course)
             # else: drop this course from the sequence (it'll form its own pathway)
 
