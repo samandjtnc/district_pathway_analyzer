@@ -20,58 +20,48 @@ from district_pathway_analyzer.models import (
 logger = logging.getLogger(__name__)
 
 
-# Domain definitions for reference
+# Domain definitions for reference (Advance CTE aligned)
 DOMAIN_DEFINITIONS = {
-    DigitalDomain.COMPUTER_SCIENCE: (
-        "Algorithms, computational thinking, programming concepts, abstraction, "
-        "theoretical foundations"
-    ),
-    DigitalDomain.SOFTWARE_DEV: (
-        "Language-specific, tool-forward coding courses (Python Programming, "
-        "Java Development)"
-    ),
     DigitalDomain.DATA_AI: (
-        "AI concepts, data analysis, machine learning, modeling, AI ethics"
+        "Data analysis, machine learning, artificial intelligence, data modeling, "
+        "natural language processing, AI ethics"
     ),
-    DigitalDomain.CYBERSECURITY: (
-        "Network systems, security principles, infrastructure, threat mitigation"
+    DigitalDomain.IT_SUPPORT: (
+        "Hardware support, software troubleshooting, help desk, IT services, "
+        "system maintenance, technical support"
     ),
-    DigitalDomain.IT_SYSTEMS: (
-        "Hardware, operating systems, troubleshooting, IT support, help desk"
+    DigitalDomain.NETWORK_CYBER: (
+        "Network administration, cybersecurity, network setup, security measures, "
+        "threat prevention, infrastructure protection"
     ),
-    DigitalDomain.ENGINEERING_AUTO: (
-        "Robotics, mechatronics (ONLY if computing/software is explicit)"
+    DigitalDomain.SOFTWARE_SOLUTIONS: (
+        "Programming, application development, software engineering, computer science, "
+        "game development, app design, algorithms, coding"
     ),
-    DigitalDomain.DIGITAL_MEDIA: (
-        "Design, media production, game design, digital arts"
+    DigitalDomain.WEB_CLOUD: (
+        "Web development, web design, front-end, back-end, cloud services, "
+        "cloud infrastructure, HTML, CSS, JavaScript, web applications"
+    ),
+    DigitalDomain.UNMANNED_VEHICLES: (
+        "Drones, unmanned aerial vehicles (UAV), autonomous vehicles, drone technology"
+    ),
+    DigitalDomain.DESIGN_DIGITAL_ARTS: (
+        "Graphic design, digital arts, animation, visual design, print design, "
+        "image editing, digital media production, multimedia"
+    ),
+    DigitalDomain.ROBOTICS: (
+        "Robotics, mechatronics, smart manufacturing, robot programming"
+    ),
+    DigitalDomain.ENGINEERING: (
+        "Engineering principles, manufacturing, prototyping, CAD, technical drawing"
     ),
     DigitalDomain.EMERGING_TECH: (
-        "IoT, cloud computing, AR/VR, drones, blockchain"
+        "IoT, AR/VR, blockchain, quantum computing, emerging technologies"
     ),
 }
 
-# Title keyword mappings for rule-based tagging
+# Title keyword mappings for rule-based tagging (Advance CTE aligned)
 TITLE_KEYWORDS = {
-    DigitalDomain.COMPUTER_SCIENCE: [
-        "computer science",
-        "ap computer science",
-        "ap cs",
-        "computational thinking",
-        "algorithms",
-        "data structures",
-    ],
-    DigitalDomain.SOFTWARE_DEV: [
-        "programming",
-        "python",
-        "java",
-        "javascript",
-        "c++",
-        "software",
-        "coding",
-        "app development",
-        "mobile development",
-        "web development",
-    ],
     DigitalDomain.DATA_AI: [
         "artificial intelligence",
         "ai",
@@ -79,18 +69,9 @@ TITLE_KEYWORDS = {
         "data science",
         "data analytics",
         "big data",
+        "ai foundations",
     ],
-    DigitalDomain.CYBERSECURITY: [
-        "cybersecurity",
-        "cyber security",
-        "network security",
-        "information security",
-        "ethical hacking",
-        "networking",
-        "network admin",
-        "cisco",
-    ],
-    DigitalDomain.IT_SYSTEMS: [
+    DigitalDomain.IT_SUPPORT: [
         "information technology",
         "it support",
         "it essentials",
@@ -101,15 +82,59 @@ TITLE_KEYWORDS = {
         "a+ certification",
         "comptia",
     ],
-    DigitalDomain.ENGINEERING_AUTO: [
-        "robotics",
-        "automation",
-        "mechatronics",
-        "engineering technology",
+    DigitalDomain.NETWORK_CYBER: [
+        "cybersecurity",
+        "cyber security",
+        "network security",
+        "information security",
+        "ethical hacking",
+        "networking",
+        "network admin",
+        "cisco",
+        "ccna",
     ],
-    DigitalDomain.DIGITAL_MEDIA: [
+    DigitalDomain.SOFTWARE_SOLUTIONS: [
+        "programming",
+        "python",
+        "java",
+        "javascript",
+        "c++",
+        "software",
+        "coding",
+        "app development",
+        "mobile development",
         "game design",
         "game development",
+        "computer science",
+        "ap computer science",
+        "ap cs",
+        "computational thinking",
+        "algorithms",
+        "data structures",
+        "object-oriented",
+        "oop",
+    ],
+    DigitalDomain.WEB_CLOUD: [
+        "web development",
+        "web design",
+        "front-end",
+        "back-end",
+        "html",
+        "css",
+        "cloud computing",
+        "cloud services",
+        "website",
+        "web app",
+        "intro to web",
+    ],
+    DigitalDomain.UNMANNED_VEHICLES: [
+        "drone",
+        "drones",
+        "uav",
+        "unmanned aerial",
+        "autonomous vehicle",
+    ],
+    DigitalDomain.DESIGN_DIGITAL_ARTS: [
         "graphic design",
         "digital design",
         "animation",
@@ -118,15 +143,35 @@ TITLE_KEYWORDS = {
         "digital media",
         "3d modeling",
         "digital art",
+        "print design",
+        "image edit",
+        "photo edit",
+        "visual design",
+        "adobe",
+        "photoshop",
+        "illustrator",
+    ],
+    DigitalDomain.ROBOTICS: [
+        "robotics",
+        "mechatronics",
+        "robot programming",
+    ],
+    DigitalDomain.ENGINEERING: [
+        "engineering",
+        "cad",
+        "drafting",
+        "technical drawing",
+        "autocad",
+        "solidworks",
+        "manufacturing",
     ],
     DigitalDomain.EMERGING_TECH: [
-        "cloud computing",
         "iot",
         "internet of things",
         "virtual reality",
         "augmented reality",
-        "drone",
         "blockchain",
+        "quantum",
     ],
 }
 
@@ -238,14 +283,14 @@ class DomainTagger:
 
         # Special rules
 
-        # Rule 3: Engineering ONLY if computing explicit
-        if primary == DigitalDomain.ENGINEERING_AUTO:
+        # Rule 3: Robotics/Engineering ONLY if computing/digital explicit
+        if primary in [DigitalDomain.ROBOTICS, DigitalDomain.ENGINEERING]:
             has_computing = any(
                 kw in title_lower or kw in desc_lower
-                for kw in ["programming", "python", "code", "software"]
+                for kw in ["programming", "python", "code", "software", "robot", "automation", "digital"]
             )
             if not has_computing:
-                # Demote to secondary or remove
+                # Demote to secondary or remove (not digital tech focused)
                 if secondary:
                     primary = secondary.pop(0)
                 else:

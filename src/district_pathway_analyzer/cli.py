@@ -108,7 +108,7 @@ def analyze(
         Panel(
             f"[bold blue]District Pathway Analyzer[/bold blue]\n"
             f"Analyzing: {district_name}, {state}",
-            title="🎓 CTE Analysis",
+            title="CTE Analysis",
         )
     )
 
@@ -147,9 +147,9 @@ def analyze(
     console.print()
 
     if report.pipeline_status.value == "success":
-        console.print("[green]✓ Analysis completed successfully[/green]")
+        console.print("[green]Analysis completed successfully[/green]")
     elif report.pipeline_status.value == "partial":
-        console.print("[yellow]⚠ Analysis completed with warnings[/yellow]")
+        console.print("[yellow]Analysis completed with warnings[/yellow]")
     else:
         console.print("[red]✗ Analysis failed[/red]")
 

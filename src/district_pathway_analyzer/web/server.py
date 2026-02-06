@@ -344,7 +344,7 @@ def main():
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
 
-    print(f"\n🎓 District Pathway Analyzer Web Interface")
+    print(f"\nDistrict Pathway Analyzer Web Interface")
     print(f"   Starting server at http://{host}:{port}")
     print(f"   Press Ctrl+C to stop\n")
 

@@ -27,18 +27,25 @@ class ConfidenceLevel(str, Enum):
 
 
 class DigitalDomain(str, Enum):
-    """Authoritative domain tags for Digital Technology courses."""
+    """Authoritative domain tags for Digital Technology courses.
 
-    # Core Digital Technology Domains
-    COMPUTER_SCIENCE = "Computer Science (CS)"
-    SOFTWARE_DEV = "Software Development / Programming"
+    Aligned with Advance CTE Career Clusters and Sub-Clusters.
+    """
+
+    # Digital Technology Cluster (Core Sub-Clusters)
     DATA_AI = "Data Science & Artificial Intelligence"
-    CYBERSECURITY = "Cybersecurity & Networking"
-    IT_SYSTEMS = "Information Technology / IT Systems"
+    IT_SUPPORT = "Information Technology (IT) Support & Services"
+    NETWORK_CYBER = "Network Systems & Cybersecurity"
+    SOFTWARE_SOLUTIONS = "Software Solutions"
+    WEB_CLOUD = "Web & Cloud"
+    UNMANNED_VEHICLES = "Unmanned Vehicle Technology"
 
-    # Adjacent/Embedded Domains
-    ENGINEERING_AUTO = "Engineering & Automation"
-    DIGITAL_MEDIA = "Digital Media & Creative Technology"
+    # Adjacent/Embedded Clusters (Select Sub-Clusters)
+    DESIGN_DIGITAL_ARTS = "Design & Digital Arts"
+    ROBOTICS = "Robotics"
+    ENGINEERING = "Engineering"
+
+    # Legacy/Catch-all (for courses that don't fit cleanly)
     EMERGING_TECH = "Emerging / Applied Digital Technology"
 
 

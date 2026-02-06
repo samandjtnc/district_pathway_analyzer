@@ -498,6 +498,17 @@
             color: #0093A4;
         }
 
+        .version-badge {
+            display: inline-block;
+            background: rgba(0, 147, 164, 0.2);
+            color: #00FFF5;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            font-family: 'Courier New', monospace;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -549,7 +560,7 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary" id="submit-btn">
-                    <span>🔍</span> Analyze District
+                    Analyze District
                 </button>
             </form>
         </div>
@@ -572,6 +583,7 @@
     <footer>
         <p>Powered by <a href="https://code.org" target="_blank">Code.org</a> |
            <a href="https://github.com/code-dot-org" target="_blank">View on GitHub</a></p>
+        <div class="version-badge">v2.1.0 • AI Descriptions + Semantic Keywords</div>
     </footer>
 
     <script>
@@ -654,7 +666,7 @@
                 console.error('Error:', error);
                 alert('Failed to start analysis: ' + error.message);
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span>🔍</span> Analyze District';
+                submitBtn.innerHTML = 'Analyze District';
             }
         });
 
@@ -918,7 +930,7 @@
             fileName.textContent = '';
             fileUpload.classList.remove('has-file');
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span>🔍</span> Analyze District';
+            submitBtn.innerHTML = 'Analyze District';
             progressBar.style.width = '30%';
 
             inputSection.style.display = 'block';

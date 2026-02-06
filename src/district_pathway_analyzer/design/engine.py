@@ -39,14 +39,30 @@ AI_FOUNDATIONS_INFO = {
     "prerequisites": "None required",
     "credit_type": "CTE or Academic",
     "duration": "Full year (2 semesters)",
-    "topics": [
-        "Problem Solving with AI",
-        "Foundations of AI Programming (Python)",
-        "AI and the Systems That Power It",
-        "The Fabric of the Internet and AI",
-        "AI-Powered Threats and Defenses",
-        "Insights from Data and AI",
-    ],
+    "semesters": {
+        "semester_1": {
+            "title": "Semester 1",
+            "topics": [
+                "Problem Solving with AI",
+                "Foundations of AI Programming (Python)",
+                "AI and the Systems That Power It",
+                "The Fabric of the Internet and AI",
+                "AI-Powered Threats and Defenses",
+                "Introduction to Data Science",
+            ],
+        },
+        "semester_2": {
+            "title": "Semester 2",
+            "topics": [
+                "AI-Generated Design",
+                "AI and Algorithmic Decisions",
+                "Building Data-Driven Systems with AI",
+                "Iterating with AI",
+                "Designing Reliable Apps with AI and APIs",
+                "Web Apps with AI Capstone Project",
+            ],
+        },
+    },
     "positioning": "Entry-level course accessible to beginners with no prior CS experience",
 }
 

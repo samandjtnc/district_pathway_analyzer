@@ -49,6 +49,7 @@ class DescriptionGenerator:
             f"Generating descriptions for {len(courses_needing_descriptions)} courses "
             f"(out of {len(courses)} total)"
         )
+        logger.info(f"Courses needing descriptions: {[c.title for c in courses_needing_descriptions[:5]]}...")
 
         # Generate descriptions in batches for efficiency
         for course in courses_needing_descriptions:
@@ -57,7 +58,7 @@ class DescriptionGenerator:
                 if description:
                     course.description = description
                     self.generation_count += 1
-                    logger.debug(f"Generated description for: {course.title}")
+                    logger.info(f"Generated description for '{course.title}': {description[:80]}...")
             except Exception as e:
                 logger.warning(f"Failed to generate description for '{course.title}': {e}")
                 # Continue without description rather than failing the entire pipeline
@@ -88,19 +89,8 @@ Requirements:
 Description:"""
 
         try:
-            response = self.llm.messages.create(
-                model=self.model,
-                max_tokens=200,  # Short descriptions only
-                temperature=0.7,  # Some creativity but mostly factual
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-            )
-
-            description = response.content[0].text.strip()
+            # Use LLMClient's complete() method instead of raw Anthropic SDK
+            description = self.llm.complete(prompt, temperature=0.7).strip()
 
             # Sanity check: description should be reasonable length
             if len(description) < 20:

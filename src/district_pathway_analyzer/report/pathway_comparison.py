@@ -2,12 +2,15 @@
 Generate pathway comparison HTML visualization showing before/after with AI Foundations.
 """
 
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Set
 
 from district_pathway_analyzer.models import DistrictAnalysisReport
+
+logger = logging.getLogger(__name__)
 
 
 class PathwayComparisonGenerator:
@@ -63,7 +66,7 @@ class PathwayComparisonGenerator:
 
     {self._build_impact_section(report)}
 
-    <div class="logo">code.org | {district_name} Pathway Analysis | Generated {datetime.now().strftime('%B %d, %Y')}</div>
+    <div class="logo">code.org | {district_name} Pathway Analysis | Generated {datetime.now().strftime('%B %d, %Y')} | v2.1.0</div>
 </body>
 </html>"""
         return html
@@ -172,7 +175,12 @@ class PathwayComparisonGenerator:
         return intersection / union if union > 0 else 0.0
 
     def _group_into_sequences(self, courses: List[Dict]) -> Dict[str, List[Dict]]:
-        """Group courses into logical sequences based on document order, role progression, and title similarity.
+        """Group courses into logical sequences based on domain clustering and matrix comparison.
+
+        Strategy:
+        1. Group courses by domain first (prevents cross-domain pollution)
+        2. Within each domain, compare every course to every other (matrix approach)
+        3. Build sequences using similarity, role progression, and document order
 
         Args:
             courses: List of course dictionaries (in document order)
@@ -183,12 +191,42 @@ class PathwayComparisonGenerator:
         if not courses:
             return {}
 
-        sequences = {}
-        used_indices = set()
-
         # Add document index to preserve order
         for i, course in enumerate(courses):
             course['_doc_index'] = i
+
+        # STEP 1: Cluster courses by domain
+        from collections import defaultdict
+        domain_clusters = defaultdict(list)
+        for course in courses:
+            domain = course.get('domain', 'unknown')
+            domain_clusters[domain].append(course)
+
+        logger.info(f"Clustered into {len(domain_clusters)} domains: {dict((k, len(v)) for k, v in domain_clusters.items())}")
+
+        # STEP 2: Process each domain cluster independently
+        all_sequences = {}
+        for domain, domain_courses in domain_clusters.items():
+            logger.info(f"Processing domain '{domain}' with {len(domain_courses)} courses: {[c['title'] for c in domain_courses]}")
+            domain_sequences = self._group_within_domain(domain_courses)
+            all_sequences.update(domain_sequences)
+
+        return all_sequences
+
+    def _group_within_domain(self, courses: List[Dict]) -> Dict[str, List[Dict]]:
+        """Group courses within a single domain using matrix comparison.
+
+        Args:
+            courses: List of courses in the same domain
+
+        Returns:
+            Dictionary mapping sequence names to course lists
+        """
+        if not courses:
+            return {}
+
+        sequences = {}
+        used_indices = set()
 
         for i, course in enumerate(courses):
             if i in used_indices:
@@ -215,6 +253,9 @@ class PathwayComparisonGenerator:
                 )
                 is_similar = similarity >= 0.7
 
+                # Log similarity for debugging
+                logger.info(f"Similarity between '{course['title']}' and '{other_course['title']}': {similarity:.3f}")
+
                 # Signal 2: Sequential in document + compatible roles + MINIMUM similarity
                 # This prevents grouping totally unrelated courses just because they're next to each other
                 is_sequential = abs(j - i) <= 3  # Within 3 positions
@@ -231,8 +272,18 @@ class PathwayComparisonGenerator:
 
                 # Group if any strong signal is present
                 if is_similar or (is_sequential and is_role_progression and has_minimum_similarity) or is_moderate_and_sequential:
+                    reason = []
+                    if is_similar:
+                        reason.append(f"high_similarity({similarity:.3f})")
+                    if is_sequential and is_role_progression and has_minimum_similarity:
+                        reason.append(f"sequential_progression({similarity:.3f})")
+                    if is_moderate_and_sequential:
+                        reason.append(f"moderate_sequential({similarity:.3f})")
+                    logger.info(f"GROUPED '{course['title']}' + '{other_course['title']}': {', '.join(reason)}")
                     sequence_courses.append(other_course)
                     candidate_indices.append(j)
+                elif similarity > 0.1:  # Log near-misses
+                    logger.info(f"NOT grouped '{course['title']}' + '{other_course['title']}': similarity={similarity:.3f} (threshold=0.7), sequential={is_sequential}, role_prog={is_role_progression}")
 
             # SANITY CHECK: Validate pathway coherence
             if len(sequence_courses) > 1:
@@ -297,6 +348,9 @@ class PathwayComparisonGenerator:
                 'programming': {'programming', 'code', 'coding', 'development', 'software'},
                 'python': {'programming', 'code', 'coding', 'python'},
                 'java': {'programming', 'code', 'coding', 'java'},
+                'app': {'application', 'software', 'development'},
+                'application': {'app', 'software', 'development'},
+                'mobile': {'software', 'application'},
                 'web': {'web', 'website', 'internet', 'online'},
                 'design': {'design', 'designing', 'designer'},
                 'digital': {'digital', 'computer', 'electronic'},
@@ -407,6 +461,10 @@ class PathwayComparisonGenerator:
             }
             for course in courses
         ]
+
+        # Log description availability
+        courses_with_desc = sum(1 for c in course_list if c['description'])
+        logger.info(f"Pathway grouping: {courses_with_desc}/{len(course_list)} courses have descriptions")
 
         # Group by domain first (preserve order within domain)
         domain_groups = {}
@@ -565,14 +623,14 @@ class PathwayComparisonGenerator:
         <div class="pathway-section current-state">
             <div class="section-header">
                 <span>Current State</span>
-                <span class="status-badge">⚠️ PROBLEM</span>
+                <span class="status-badge">PROBLEM</span>
             </div>
             <div class="section-subtitle">{shape_description}</div>
 
             <div class="grade-label">Grade 9-10: Choose Your Track (Limited Exploration)</div>
 
             <div class="confusion-box">
-                <div class="confusion-title">😕 Students face {num_pathways} entry points with no shared foundation</div>
+                <div class="confusion-title">Students face {num_pathways} entry points with no shared foundation</div>
                 <div class="confusion-text">
                     "Which track is right for me? What's the difference between these options?
                     I haven't learned about any of this yet. I guess I'll just pick one..."
@@ -585,7 +643,6 @@ class PathwayComparisonGenerator:
 
             <div class="problem-box">
                 <div class="problem-title">
-                    <span>⚠️</span>
                     <span>Critical Problems:</span>
                 </div>
                 <ul class="problem-list">
@@ -634,7 +691,7 @@ class PathwayComparisonGenerator:
         <div class="pathway-section designed-state">
             <div class="section-header">
                 <span>Designed State</span>
-                <span class="status-badge">✅ SOLUTION</span>
+                <span class="status-badge">SOLUTION</span>
             </div>
             <div class="section-subtitle">Strategy: {strategy} - {aif_role}</div>
 
@@ -642,16 +699,32 @@ class PathwayComparisonGenerator:
 
             <div class="entry-point">
                 <div class="entry-course">
-                    <div class="entry-course-title">🤖 AI Foundations</div>
+                    <div class="entry-course-title">AI Foundations</div>
                     <div class="entry-course-subtitle">Every student explores the breadth of digital technology</div>
+                </div>
 
-                    <div class="exploration-topics">
-                        <div class="topic-badge">🧠 Artificial Intelligence</div>
-                        <div class="topic-badge">🐍 Python Programming</div>
-                        <div class="topic-badge">💻 Computer Systems</div>
-                        <div class="topic-badge">🌐 Networks</div>
-                        <div class="topic-badge">🔒 Cybersecurity</div>
-                        <div class="topic-badge">📊 Data Science</div>
+                <div class="semester-cards">
+                    <div class="semester-card">
+                        <div class="semester-card-header">Semester 1</div>
+                        <div class="semester-topics">
+                            <div class="topic-badge">Problem Solving with AI</div>
+                            <div class="topic-badge">AI Programming (Python)</div>
+                            <div class="topic-badge">Systems That Power AI</div>
+                            <div class="topic-badge">Internet &amp; Networks</div>
+                            <div class="topic-badge">Cybersecurity</div>
+                            <div class="topic-badge">Data Science</div>
+                        </div>
+                    </div>
+                    <div class="semester-card">
+                        <div class="semester-card-header">Semester 2</div>
+                        <div class="semester-topics">
+                            <div class="topic-badge">AI-Generated Design</div>
+                            <div class="topic-badge">Algorithmic Decisions</div>
+                            <div class="topic-badge">Data-Driven Systems</div>
+                            <div class="topic-badge">Iterating with AI</div>
+                            <div class="topic-badge">Apps with AI &amp; APIs</div>
+                            <div class="topic-badge">Web Apps Capstone</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -669,7 +742,6 @@ class PathwayComparisonGenerator:
 
             <div class="benefit-box">
                 <div class="benefit-title">
-                    <span>✅</span>
                     <span>Transformative Benefits:</span>
                 </div>
                 <ul class="benefit-list">
@@ -700,38 +772,38 @@ class PathwayComparisonGenerator:
             shape = report.landscape.pathway_shape.value
 
             if shape == 'parallel_silos':
-                problems.append("<strong>❌ Premature specialization</strong> - Students locked into narrow tracks before understanding the field")
-                problems.append("<strong>❌ No shared foundation</strong> - Missing cross-cutting concepts (AI, data, systems thinking)")
-                problems.append("<strong>❌ Parallel silos</strong> - Multiple separate entry points create confusion and fragmentation")
+                problems.append("<strong>Premature specialization</strong> - Students locked into narrow tracks before understanding the field")
+                problems.append("<strong>No shared foundation</strong> - Missing cross-cutting concepts (AI, data, systems thinking)")
+                problems.append("<strong>Parallel silos</strong> - Multiple separate entry points create confusion and fragmentation")
             elif shape == 'missing_entry':
-                problems.append("<strong>❌ No clear starting point</strong> - Students confused about which course to take first")
-                problems.append("<strong>❌ Disconnected courses</strong> - No obvious pathway progression")
+                problems.append("<strong>No clear starting point</strong> - Students confused about which course to take first")
+                problems.append("<strong>Disconnected courses</strong> - No obvious pathway progression")
             elif shape == 'late_entry':
-                problems.append("<strong>❌ Late introduction</strong> - Students miss foundational concepts")
-                problems.append("<strong>❌ Limited exploration</strong> - Advanced courses before students understand basics")
+                problems.append("<strong>Late introduction</strong> - Students miss foundational concepts")
+                problems.append("<strong>Limited exploration</strong> - Advanced courses before students understand basics")
 
         # Add common problems
-        problems.append("<strong>❌ Limited switching</strong> - Hard to change tracks once started")
-        problems.append("<strong>❌ Missing modern topics</strong> - Limited exposure to AI, machine learning, data science")
-        problems.append("<strong>❌ Student confusion</strong> - \"How do I know which track is right if I haven't tried any?\"")
+        problems.append("<strong>Limited switching</strong> - Hard to change tracks once started")
+        problems.append("<strong>Missing modern topics</strong> - Limited exposure to AI, machine learning, data science")
+        problems.append("<strong>Student confusion</strong> - \"How do I know which track is right if I haven't tried any?\"")
 
         return problems
 
     def _extract_benefits(self, report: DistrictAnalysisReport) -> List[str]:
         """Extract benefits from the designed pathway structure."""
         benefits = [
-            "<strong>✅ Informed choice</strong> - Students explore before specializing, choose with confidence",
-            "<strong>✅ Shared foundation</strong> - All students get AI, data, systems, networks, cybersecurity basics",
-            "<strong>✅ Single clear entry</strong> - One obvious starting point eliminates confusion",
-            "<strong>✅ Flexible pathways</strong> - Students can switch tracks with foundation intact",
-            "<strong>✅ Modern skills</strong> - Early exposure to AI, ML, data science throughout career",
-            "<strong>✅ All tracks preserved</strong> - Every existing course remains, just better-prepared students"
+            "<strong>Informed choice</strong> - Students explore before specializing, choose with confidence",
+            "<strong>Shared foundation</strong> - All students get AI, data, systems, networks, cybersecurity basics",
+            "<strong>Single clear entry</strong> - One obvious starting point eliminates confusion",
+            "<strong>Flexible pathways</strong> - Students can switch tracks with foundation intact",
+            "<strong>Modern skills</strong> - Early exposure to AI, ML, data science throughout career",
+            "<strong>All tracks preserved</strong> - Every existing course remains, just better-prepared students"
         ]
 
         if report.alignment and report.alignment.opportunity_signals:
             # Add specific opportunities from the analysis
             for opp in report.alignment.opportunity_signals.opportunities[:2]:
-                benefits.append(f"<strong>✅</strong> {opp}")
+                benefits.append(f"<strong>+</strong> {opp}")
 
         return benefits
 
@@ -745,7 +817,7 @@ class PathwayComparisonGenerator:
 
         <div class="impact-grid">
             <div class="impact-column before">
-                <div class="impact-column-title">❌ Before: Fragmented Entry</div>
+                <div class="impact-column-title">Before: Fragmented Entry</div>
                 <div class="impact-text">
                     <strong>Student at Grade 9:</strong> "I have to pick between these different tracks. I don't know what any of these really are or which one is right for me. I guess I'll just pick one..."
                     <br><br>
@@ -756,7 +828,7 @@ class PathwayComparisonGenerator:
             </div>
 
             <div class="impact-column after">
-                <div class="impact-column-title">✅ After: Exploration → Informed Choice</div>
+                <div class="impact-column-title">After: Exploration → Informed Choice</div>
                 <div class="impact-text">
                     <strong>Student at Grade 9:</strong> "In AI Foundations, I'm learning Python, networks, data, AI, and cybersecurity. I'm discovering what I'm really interested in!"
                     <br><br>
@@ -1003,20 +1075,41 @@ class PathwayComparisonGenerator:
             font-weight: 600;
         }
 
-        .exploration-topics {
+        .semester-cards {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 2px solid #0093A4;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .semester-card {
+            background: white;
+            border: 2px solid #0093A4;
+            border-radius: 12px;
+            padding: 14px;
+            position: relative;
+        }
+
+        .semester-card-header {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #0093A4;
+            margin-bottom: 4px;
+        }
+
+        .semester-topics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
         }
 
         .topic-badge {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 6px 10px;
+            background: rgba(0, 147, 164, 0.08);
+            border: 1px solid rgba(0, 147, 164, 0.25);
+            padding: 5px 8px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: #0093A4;
             text-align: center;
