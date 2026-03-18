@@ -349,7 +349,9 @@ You classify courses into Digital Technology domains based on their titles and d
 You follow the tagging rules precisely and provide accurate, conservative classifications."""
 
         try:
-            response = self.llm.complete_structured(prompt, system=system)
+            # cache_system=True: the system prompt is identical for every course call,
+            # so it gets cached after the first call and re-used for the whole tagging loop.
+            response = self.llm.complete_structured(prompt, system=system, cache_system=True)
 
             # Parse JSON
             json_match = re.search(r"\{[\s\S]*\}", response)

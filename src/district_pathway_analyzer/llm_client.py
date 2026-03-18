@@ -106,6 +106,7 @@ class LLMClient:
         system: Optional[str] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        cache_system: bool = False,
     ) -> str:
         """Send a completion request to the configured LLM.
 
@@ -114,6 +115,9 @@ class LLMClient:
             system: Optional system prompt
             max_tokens: Optional max tokens (defaults to config)
             temperature: Optional temperature (defaults to config)
+            cache_system: If True and using an Anthropic model, cache the system
+                prompt with cache_control ephemeral (saves tokens on repeated calls
+                with the same system prompt, e.g. tagging many courses in a loop).
 
         Returns:
             The model's response text
@@ -125,11 +129,16 @@ class LLMClient:
 
         messages = [{"role": "user", "content": prompt}]
 
+        if cache_system and system:
+            system_param = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+        else:
+            system_param = system or ""
+
         response = self.client.messages.create(
             model=self._model,
             max_tokens=resolved_max_tokens,
             temperature=temperature if temperature is not None else self.config.temperature,
-            system=system or "",
+            system=system_param,
             messages=messages,
         )
 
@@ -197,6 +206,7 @@ class LLMClient:
         response_format: Optional[Dict[str, Any]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        cache_system: bool = False,
     ) -> str:
         """Send a completion request expecting structured JSON output.
 
@@ -220,6 +230,7 @@ Please respond with valid JSON only, no additional text or markdown formatting."
             system=system,
             max_tokens=max_tokens,
             temperature=temperature,
+            cache_system=cache_system,
         )
 
         # Strip markdown fences that some models (e.g. Gemma) add despite instructions
