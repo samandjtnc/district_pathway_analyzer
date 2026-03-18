@@ -83,3 +83,10 @@ assets/*.pdf
 # Temporary files
 *.tmp
 *.temp
+
+# Local Claude Code session data
+.claude/
+
+# Local test documents (PDFs, working notes)
+*.pdf
+Domains*.md

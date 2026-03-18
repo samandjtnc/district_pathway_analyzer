@@ -28,6 +28,7 @@ COPY config.yaml ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
         anthropic \
+        openai \
         beautifulsoup4 \
         requests \
         pyyaml \

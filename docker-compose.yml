@@ -6,8 +6,12 @@ services:
     container_name: pathway-analyzer
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Required only for Free/Google models (sign up at https://openrouter.ai)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - PORT=8000
       - HOST=0.0.0.0
     volumes:

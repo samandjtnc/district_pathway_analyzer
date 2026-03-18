@@ -8,7 +8,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import uvicorn
 from dotenv import load_dotenv
@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from district_pathway_analyzer.analyzer import DistrictPathwayAnalyzer
+from district_pathway_analyzer.llm_client import LLMClient, MODEL_OPTIONS, set_llm_client
 from district_pathway_analyzer.models import PipelineStatus
 from district_pathway_analyzer.report.generator import ReportGenerator
 from district_pathway_analyzer.report.pathway_comparison import PathwayComparisonGenerator
@@ -79,6 +80,65 @@ class AnalysisStatus(BaseModel):
     error: Optional[str] = None
 
 
+# --- Pathway Editor API Models ---
+
+
+class PathwayCourse(BaseModel):
+    """A course within an editable pathway."""
+
+    id: str
+    title: str
+    role: str = "unknown"
+    domain: Optional[str] = None
+    description: Optional[str] = None
+
+
+class Pathway(BaseModel):
+    """An editable pathway containing courses."""
+
+    id: str
+    name: str
+    color_class: str = "track-python"
+    courses: List[PathwayCourse] = []
+
+
+class DesignedState(BaseModel):
+    """The designed state with AI Foundations entry point."""
+
+    strategy: str
+    aif_role: str
+    pathways: List[Pathway] = []
+
+
+class PathwayMetadata(BaseModel):
+    """Metadata about the district and analysis."""
+
+    district_name: str
+    state: str
+    pathway_shape: str = "unknown"
+
+
+class PathwayData(BaseModel):
+    """Complete pathway data for the interactive editor."""
+
+    job_id: str
+    metadata: PathwayMetadata
+    current_pathways: List[Pathway]
+    designed_state: Optional[DesignedState] = None
+
+
+class PathwayEditRequest(BaseModel):
+    """Request to update pathway data."""
+
+    current_pathways: List[Pathway]
+    designed_state: Optional[DesignedState] = None
+
+
+# --- Pathway data store (parallel to analysis_jobs) ---
+# Maps job_id -> structured pathway data dict
+pathway_store: Dict[str, dict] = {}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home():
     """Serve the main page."""
@@ -88,11 +148,18 @@ async def home():
     return HTMLResponse(content="<h1>District Pathway Analyzer</h1><p>Template not found</p>")
 
 
+@app.get("/api/models")
+def get_models():
+    """Return available model options for the frontend selector."""
+    return [{"id": mid, "label": label} for mid, label in MODEL_OPTIONS]
+
+
 @app.post("/api/analyze")
 async def start_analysis(
     background_tasks: BackgroundTasks,
     district_name: str = Form(...),
     state: str = Form(...),
+    model: Optional[str] = Form(None),
     document: Optional[UploadFile] = File(None),
 ):
     """Start a new analysis job."""
@@ -120,7 +187,7 @@ async def start_analysis(
 
     # Run analysis in background
     background_tasks.add_task(
-        run_analysis_task, job_id, district_name, state, doc_path
+        run_analysis_task, job_id, district_name, state, doc_path, model
     )
 
     return {"job_id": job_id, "status": "pending"}
@@ -131,11 +198,16 @@ def run_analysis_task(
     district_name: str,
     state: str,
     doc_path: Optional[str],
+    model: Optional[str] = None,
 ):
     """Run the analysis task in the background."""
     try:
         analysis_jobs[job_id]["status"] = "running"
         analysis_jobs[job_id]["progress"] = "Starting analysis..."
+
+        # Set the LLM client with the selected model for this job
+        if model:
+            set_llm_client(LLMClient(model=model))
 
         # Run the analyzer
         with DistrictPathwayAnalyzer() as analyzer:
@@ -242,6 +314,10 @@ def run_analysis_task(
             comparison_generator = PathwayComparisonGenerator()
             comparison_generator.generate(report, str(comparison_path))
 
+            # Extract structured pathway data for the interactive editor
+            pathway_data = comparison_generator.extract_pathway_data(report)
+            pathway_store[job_id] = pathway_data
+
             # Store file paths in result
             result["markdown_file"] = markdown_filename
             result["comparison_html_file"] = comparison_filename
@@ -327,6 +403,141 @@ async def view_comparison(job_id: str):
         raise HTTPException(status_code=404, detail="Comparison file not found")
 
     # Read and return HTML content directly for inline viewing
+    with open(comparison_path, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+
+    return HTMLResponse(content=html_content)
+
+
+# --- Pathway Editor UI ---
+
+
+@app.get("/editor/{job_id}", response_class=HTMLResponse)
+async def pathway_editor(job_id: str):
+    """Serve the interactive pathway editor for a completed analysis."""
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = analysis_jobs[job_id]
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Analysis not completed")
+
+    editor_path = TEMPLATES_DIR / "editor.html"
+    if not editor_path.exists():
+        raise HTTPException(status_code=500, detail="Editor template not found")
+
+    html = editor_path.read_text().replace("{{job_id}}", job_id)
+    return HTMLResponse(content=html)
+
+
+# --- Pathway Editor API Endpoints ---
+
+
+@app.get("/api/pathways/{job_id}")
+async def get_pathways(job_id: str):
+    """Get structured pathway data for the interactive editor.
+
+    Returns the current and designed state pathways with stable IDs,
+    ready for drag-and-drop editing.
+    """
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = analysis_jobs[job_id]
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Analysis not completed")
+
+    if job_id not in pathway_store:
+        raise HTTPException(status_code=404, detail="Pathway data not available")
+
+    data = pathway_store[job_id]
+    return PathwayData(
+        job_id=job_id,
+        metadata=PathwayMetadata(**data['metadata']),
+        current_pathways=[
+            Pathway(
+                id=pw['id'],
+                name=pw['name'],
+                color_class=pw.get('color_class', 'track-python'),
+                courses=[PathwayCourse(**c) for c in pw['courses']],
+            )
+            for pw in data['current_pathways']
+        ],
+        designed_state=DesignedState(
+            strategy=data['designed_state']['strategy'],
+            aif_role=data['designed_state']['aif_role'],
+            pathways=[
+                Pathway(
+                    id=pw['id'],
+                    name=pw['name'],
+                    color_class=pw.get('color_class', 'track-python'),
+                    courses=[PathwayCourse(**c) for c in pw['courses']],
+                )
+                for pw in data['designed_state']['pathways']
+            ],
+        ) if data.get('designed_state') else None,
+    )
+
+
+@app.put("/api/pathways/{job_id}")
+async def update_pathways(job_id: str, edit: PathwayEditRequest):
+    """Update pathway data with user edits.
+
+    Accepts renamed pathways, reordered courses, and moved courses.
+    Persists changes in memory for later export.
+    """
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = analysis_jobs[job_id]
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Analysis not completed")
+
+    if job_id not in pathway_store:
+        raise HTTPException(status_code=404, detail="Pathway data not available")
+
+    # Preserve metadata, update pathways
+    stored = pathway_store[job_id]
+    stored['current_pathways'] = [pw.model_dump() for pw in edit.current_pathways]
+    if edit.designed_state:
+        stored['designed_state'] = edit.designed_state.model_dump()
+    elif stored.get('designed_state'):
+        # Keep existing designed state but sync pathways
+        stored['designed_state']['pathways'] = [pw.model_dump() for pw in edit.current_pathways]
+
+    return {"status": "updated", "job_id": job_id}
+
+
+@app.post("/api/pathways/{job_id}/export")
+async def export_pathways(job_id: str):
+    """Regenerate pathway comparison HTML from the current (possibly edited) pathway data.
+
+    Returns the HTML inline for viewing in browser.
+    """
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = analysis_jobs[job_id]
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Analysis not completed")
+
+    if job_id not in pathway_store:
+        raise HTTPException(status_code=404, detail="Pathway data not available")
+
+    data = pathway_store[job_id]
+
+    # Determine output path (overwrite existing comparison file)
+    comparison_filename = job["result"].get("comparison_html_file")
+    if not comparison_filename:
+        raise HTTPException(status_code=404, detail="No comparison file to regenerate")
+
+    comparison_path = REPORTS_DIR / comparison_filename
+
+    # Regenerate HTML from pathway data
+    generator = PathwayComparisonGenerator()
+    generator.generate_from_pathway_data(data, str(comparison_path))
+
+    # Read and return the regenerated HTML
     with open(comparison_path, 'r', encoding='utf-8') as f:
         html_content = f.read()
 

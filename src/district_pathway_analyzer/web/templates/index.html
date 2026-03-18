@@ -548,6 +548,16 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="model">Model</label>
+                    <select id="model" name="model">
+                        <option value="" disabled>Loading models...</option>
+                    </select>
+                    <small style="color:#6b7280; font-size:0.8rem; margin-top:4px; display:block;">
+                        Free tier uses OpenRouter (requires OPENROUTER_API_KEY). Claude models use ANTHROPIC_API_KEY.
+                    </small>
+                </div>
+
+                <div class="form-group">
                     <label>Course Catalog Document (PDF)</label>
                     <div class="file-upload" id="file-upload">
                         <input type="file" id="document" name="document" accept=".pdf,.html,.htm">
@@ -590,6 +600,26 @@
         // State management
         let currentJobId = null;
         let pollInterval = null;
+
+        // Populate model selector from API
+        const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
+        fetch('/api/models')
+            .then(r => r.json())
+            .then(models => {
+                const sel = document.getElementById('model');
+                sel.innerHTML = '';
+                models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.label;
+                    if (m.id === DEFAULT_MODEL) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                const sel = document.getElementById('model');
+                sel.innerHTML = '<option value="claude-sonnet-4-5-20250929">Standard | Claude Sonnet 4.5</option>';
+            });
 
         // DOM Elements
         const form = document.getElementById('analysis-form');
@@ -906,6 +936,9 @@
                         </a>
                         <a href="/api/view-comparison/${currentJobId}" class="download-btn-comparison" target="_blank">
                             <span>🔀</span> View Pathway Comparison
+                        </a>
+                        <a href="/editor/${currentJobId}" class="download-btn" target="_blank" style="background: #292F36;">
+                            Edit Pathways
                         </a>
                         <button class="reset-btn" onclick="resetForm()">Analyze Another District</button>
                     </div>

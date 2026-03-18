@@ -1,5 +1,8 @@
 """
-LLM client for interacting with Claude API.
+LLM client for interacting with Claude API or OpenRouter.
+
+Set ANTHROPIC_API_KEY for Claude models.
+Set OPENROUTER_API_KEY for free/Google models via OpenRouter (https://openrouter.ai).
 """
 
 import base64
@@ -8,18 +11,48 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from anthropic import Anthropic
+from openai import OpenAI
 
 from district_pathway_analyzer.config import get_config
 
+# ---------------------------------------------------------------------------
+# Model tiers — used to populate the frontend model selector
+# ---------------------------------------------------------------------------
+MODEL_OPTIONS = [
+    ("stepfun/step-3.5-flash:free",       "Free  |  Step 3.5 Flash (via OpenRouter)"),
+    ("google/gemma-3-27b-it:free",        "Free  |  Gemma 3-27b (via OpenRouter)"),
+    ("google/gemini-2.0-flash-exp:free",  "Free  |  Gemini 2.0 Flash Exp (via OpenRouter)"),
+    ("claude-haiku-4-5-20251001",         "Budget  |  Claude Haiku 4.5"),
+    ("claude-sonnet-4-5-20250929",        "Standard  |  Claude Sonnet 4.5"),
+    ("claude-sonnet-4-6",                 "Standard  |  Claude Sonnet 4.6 (Latest)"),
+    ("claude-opus-4-6",                   "Premium  |  Claude Opus 4.6"),
+]
+
+
+def _is_openrouter_model(model: str) -> bool:
+    """Return True for models routed through OpenRouter."""
+    return (
+        model.startswith("google/")
+        or model.startswith("meta/")
+        or model.startswith("mistralai/")
+        or ":free" in model
+    )
+
+
+def _is_no_system_prompt_model(model: str) -> bool:
+    """Return True for models that don't support a separate system role (e.g. Gemma)."""
+    return "gemma" in model.lower()
+
 
 class LLMClient:
-    """Client for interacting with Claude API."""
+    """Client for interacting with Claude API or OpenRouter."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """Initialize the LLM client.
 
         Args:
-            api_key: Optional API key. If not provided, will use ANTHROPIC_API_KEY env var.
+            api_key: Optional Anthropic API key. Falls back to ANTHROPIC_API_KEY env var.
+            model:   Optional model override. Falls back to config.yaml value.
         """
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not self.api_key:
@@ -28,6 +61,44 @@ class LLMClient:
             )
         self.client = Anthropic(api_key=self.api_key)
         self.config = get_config().llm
+        self._model_override = model  # None means use config default
+
+    @property
+    def _model(self) -> str:
+        return self._model_override or self.config.model
+
+    def _call_openrouter(
+        self,
+        prompt: str,
+        system: Optional[str],
+        max_tokens: int,
+    ) -> str:
+        """Route a call through OpenRouter."""
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+        if not openrouter_key:
+            raise ValueError(
+                "OPENROUTER_API_KEY is not set. "
+                "Free and Google models require an OpenRouter API key. "
+                "Sign up at https://openrouter.ai and add OPENROUTER_API_KEY to your environment."
+            )
+        or_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=openrouter_key,
+        )
+        # Gemma doesn't support a system role — fold it into the user message
+        if _is_no_system_prompt_model(self._model) and system:
+            messages = [{"role": "user", "content": f"{system}\n\n{prompt}"}]
+        else:
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+        response = or_client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content
 
     def complete(
         self,
@@ -36,7 +107,7 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> str:
-        """Send a completion request to Claude.
+        """Send a completion request to the configured LLM.
 
         Args:
             prompt: The user prompt
@@ -47,11 +118,16 @@ class LLMClient:
         Returns:
             The model's response text
         """
+        resolved_max_tokens = max_tokens or self.config.max_tokens
+
+        if _is_openrouter_model(self._model):
+            return self._call_openrouter(prompt, system, resolved_max_tokens)
+
         messages = [{"role": "user", "content": prompt}]
 
         response = self.client.messages.create(
-            model=self.config.model,
-            max_tokens=max_tokens or self.config.max_tokens,
+            model=self._model,
+            max_tokens=resolved_max_tokens,
             temperature=temperature if temperature is not None else self.config.temperature,
             system=system or "",
             messages=messages,
@@ -68,6 +144,9 @@ class LLMClient:
         temperature: Optional[float] = None,
     ) -> str:
         """Send a completion request with images to Claude.
+
+        Note: Image support requires an Anthropic model. OpenRouter models that
+        support vision can also be used but image encoding format may differ.
 
         Args:
             prompt: The user prompt
@@ -102,7 +181,7 @@ class LLMClient:
         messages = [{"role": "user", "content": content}]
 
         response = self.client.messages.create(
-            model=self.config.model,
+            model=self._model,
             max_tokens=max_tokens or self.config.max_tokens,
             temperature=temperature if temperature is not None else self.config.temperature,
             system=system or "",
@@ -136,12 +215,19 @@ class LLMClient:
 
 Please respond with valid JSON only, no additional text or markdown formatting."""
 
-        return self.complete(
+        raw = self.complete(
             prompt=structured_prompt,
             system=system,
             max_tokens=max_tokens,
             temperature=temperature,
         )
+
+        # Strip markdown fences that some models (e.g. Gemma) add despite instructions
+        import re
+        raw = raw.strip()
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+        return raw
 
     def _encode_image(self, path: str) -> Optional[Dict[str, str]]:
         """Encode an image file to base64.
