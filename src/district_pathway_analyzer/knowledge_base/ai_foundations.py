@@ -30,7 +30,7 @@ AI_FOUNDATIONS_CURRICULUM = {
     ),
     "semesters": {
         "semester_1": {
-            "title": "AI Foundations Semester 1",
+            "title": "AIF: Exploring CS and AI",
             "status": "Final",
             "overview": (
                 "AIF Semester 1 consists of six units designed to provide students with "
@@ -430,7 +430,7 @@ AI_FOUNDATIONS_CURRICULUM = {
             ],
         },
         "semester_2": {
-            "title": "AI Foundations Semester 2",
+            "title": "AIF: Designing and Building with AI",
             "status": "DRAFT",
             "overview": (
                 "AI Foundations Semester 2 equips students to become intentional designers "

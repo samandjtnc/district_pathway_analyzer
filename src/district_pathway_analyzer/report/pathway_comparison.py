@@ -6,7 +6,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set
 
 from district_pathway_analyzer.models import DistrictAnalysisReport
 
@@ -34,6 +34,230 @@ class PathwayComparisonGenerator:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
+        return output_path
+
+    def extract_pathway_data(self, report: DistrictAnalysisReport) -> Dict:
+        """Extract structured pathway data from a report for the interactive editor.
+
+        Returns a JSON-serializable dict with current and designed state pathways,
+        each pathway having an ID, name, color_class, and list of courses with IDs.
+        """
+        current_pathways = self._extract_current_pathways(report)
+
+        # Assign stable IDs to pathways and courses
+        pathways_with_ids = []
+        for i, pathway in enumerate(current_pathways):
+            courses_with_ids = []
+            for j, course in enumerate(pathway['courses']):
+                courses_with_ids.append({
+                    'id': f'course-{i}-{j}',
+                    'title': course['title'],
+                    'role': course.get('role', 'unknown'),
+                    'domain': course.get('domain'),
+                    'description': course.get('description'),
+                })
+            pathways_with_ids.append({
+                'id': f'pathway-{i}',
+                'name': pathway['name'],
+                'color_class': pathway['color_class'],
+                'courses': courses_with_ids,
+            })
+
+        # Build designed state metadata
+        designed_state = None
+        if report.design:
+            designed_state = {
+                'strategy': report.design.strategy.value,
+                'aif_role': report.design.aif_role.value,
+                'pathways': pathways_with_ids,  # Same pathways, shown after AIF entry
+            }
+
+        # Build metadata from report
+        metadata = {
+            'district_name': report.district_name,
+            'state': report.state,
+            'pathway_shape': report.landscape.pathway_shape.value if report.landscape else 'unknown',
+        }
+
+        return {
+            'metadata': metadata,
+            'current_pathways': pathways_with_ids,
+            'designed_state': designed_state,
+        }
+
+    def generate_from_pathway_data(
+        self,
+        pathway_data: Dict,
+        output_path: str,
+    ) -> str:
+        """Regenerate pathway comparison HTML from edited pathway data.
+
+        This is used by the export endpoint to produce HTML from user-edited
+        pathway structures, without needing the full DistrictAnalysisReport.
+
+        Args:
+            pathway_data: Structured pathway data (as returned by extract_pathway_data,
+                          possibly modified by the user).
+            output_path: Path to write the HTML file.
+
+        Returns:
+            Path to the generated HTML file.
+        """
+        meta = pathway_data['metadata']
+        district_name = meta['district_name']
+        state = meta['state']
+        current_shape = meta.get('pathway_shape', 'unknown')
+
+        # Convert pathway data back to the internal format used by _build_current_state / _build_designed_state
+        current_pathways = []
+        for pw in pathway_data['current_pathways']:
+            current_pathways.append({
+                'name': pw['name'],
+                'color_class': pw.get('color_class', 'track-python'),
+                'courses': [
+                    {
+                        'title': c['title'],
+                        'role': c.get('role', 'unknown'),
+                        'domain': c.get('domain'),
+                        'description': c.get('description'),
+                    }
+                    for c in pw['courses']
+                ],
+            })
+
+        designed = pathway_data.get('designed_state')
+        strategy_label = ''
+        aif_role_label = ''
+        if designed:
+            strategy_label = designed.get('strategy', '').replace('_', ' ').title()
+            aif_role_label = designed.get('aif_role', '').replace('_', ' ').title()
+
+        # Build HTML using the same templates
+        num_pathways = len(current_pathways)
+        grid_cols = 2 if num_pathways <= 4 else (3 if num_pathways <= 6 else 4)
+
+        # Current state tracks
+        tracks_html = ''
+        for pathway in current_pathways:
+            courses_html = ''
+            for i, course in enumerate(pathway['courses']):
+                courses_html += f'<div class="course-box">{course["title"]}</div>\n'
+                if i < len(pathway['courses']) - 1:
+                    courses_html += '<div class="course-arrow">↓</div>\n'
+            tracks_html += f"""
+                <div class="track {pathway['color_class']}">
+                    <div class="track-title">{pathway['name']}</div>
+                    {courses_html}
+                </div>
+            """
+
+        # Designed state tracks
+        designed_tracks_html = ''
+        designed_pathways = designed.get('pathways', current_pathways) if designed else current_pathways
+        d_grid_cols = 2 if len(designed_pathways) <= 4 else 3
+        for pathway in designed_pathways:
+            pw = pathway if isinstance(pathway, dict) and 'color_class' in pathway else {
+                'name': pathway.get('name', ''),
+                'color_class': pathway.get('color_class', 'track-python'),
+                'courses': pathway.get('courses', []),
+            }
+            courses_html = ''
+            for i, course in enumerate(pw['courses']):
+                courses_html += f'<div class="course-box {pw["color_class"]}">{course["title"]}</div>\n'
+                if i < len(pw['courses']) - 1:
+                    courses_html += '<div class="course-arrow">↓</div>\n'
+            benefit_text = self._get_pathway_benefit(pw['name'])
+            designed_tracks_html += f"""
+                <div class="informed-track">
+                    <div class="informed-track-title">{pw['name']}</div>
+                    {courses_html}
+                    <div style="text-align: center; font-size: 10px; color: #0093A4; margin-top: 6px; font-style: italic;">
+                        ✓ {benefit_text}
+                    </div>
+                </div>
+            """
+
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{district_name}: Before and After AI Foundations</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+    {self._get_styles()}
+</head>
+<body>
+    <div class="main-title">{district_name}, {state} - Digital Technology Pathways</div>
+    <div class="subtitle">Current {current_shape.replace('_', ' ')} structure vs. designed entry point with AI Foundations</div>
+
+    <div class="comparison-container">
+        <div class="pathway-section current-state">
+            <div class="section-header">
+                <span>Current State</span>
+                <span class="status-badge">PROBLEM</span>
+            </div>
+            <div class="parallel-tracks" style="grid-template-columns: repeat({grid_cols}, 1fr);">
+                {tracks_html}
+            </div>
+        </div>
+
+        <div class="pathway-section designed-state">
+            <div class="section-header">
+                <span>Designed State</span>
+                <span class="status-badge">SOLUTION</span>
+            </div>
+            <div class="section-subtitle">Strategy: {strategy_label} - {aif_role_label}</div>
+
+            <div class="entry-point">
+                <div class="entry-course">
+                    <div class="entry-course-title">AI Foundations</div>
+                    <div class="entry-course-subtitle">Every student explores the breadth of digital technology</div>
+                </div>
+
+                <div class="semester-cards">
+                    <div class="semester-card">
+                        <div class="semester-card-header">Semester 1</div>
+                        <div class="semester-topics">
+                            <div class="topic-badge">Problem Solving with AI</div>
+                            <div class="topic-badge">AI Programming (Python)</div>
+                            <div class="topic-badge">Systems That Power AI</div>
+                            <div class="topic-badge">Internet &amp; Networks</div>
+                            <div class="topic-badge">Cybersecurity</div>
+                            <div class="topic-badge">Data Science</div>
+                        </div>
+                    </div>
+                    <div class="semester-card">
+                        <div class="semester-card-header">Semester 2</div>
+                        <div class="semester-topics">
+                            <div class="topic-badge">AI-Generated Design</div>
+                            <div class="topic-badge">Algorithmic Decisions</div>
+                            <div class="topic-badge">Data-Driven Systems</div>
+                            <div class="topic-badge">Iterating with AI</div>
+                            <div class="topic-badge">Apps with AI &amp; APIs</div>
+                            <div class="topic-badge">Web Apps Capstone</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="big-arrow">
+                <div class="big-arrow-text">Students now make INFORMED choices</div>
+                <div class="big-arrow-icon">↓</div>
+            </div>
+
+            <div class="informed-tracks" style="grid-template-columns: repeat({d_grid_cols}, 1fr);">
+                {designed_tracks_html}
+            </div>
+        </div>
+    </div>
+
+    <div class="logo">code.org | {district_name} Pathway Analysis | Generated {datetime.now().strftime('%B %d, %Y')} | v2.1.0</div>
+</body>
+</html>"""
+
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html)
         return output_path
 
     def _build_html(self, report: DistrictAnalysisReport) -> str:
@@ -845,190 +1069,201 @@ class PathwayComparisonGenerator:
         """Return the CSS styles for the HTML."""
         return """
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --teal: #0093A4;
+            --teal-deep: #006B77;
+            --purple: #8C52BA;
+            --strawberry: #ED6060;
+            --dark: #131518;
+            --canvas: #F0EDE8;
+            --surface: #FAFAF8;
+            --text: #1A1D23;
+            --text-secondary: #6B6560;
+            --text-muted: #9B958E;
+            --warm-gray: #D5D0C8;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Figtree', sans-serif;
-            background: #FFFFFF;
-            padding: 40px;
+            background: var(--canvas);
+            padding: 48px 40px;
             min-height: 100vh;
+            color: var(--text);
         }
 
         .main-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 42px;
-            font-weight: 600;
-            color: #292F36;
+            font-size: 44px;
+            font-weight: 700;
+            color: var(--text);
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
         }
 
         .subtitle {
-            font-size: 18px;
-            color: #6B7280;
+            font-size: 15px;
+            color: var(--text-muted);
             text-align: center;
-            margin-bottom: 50px;
-            font-style: italic;
+            margin-bottom: 48px;
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-weight: 400;
+            letter-spacing: 0.02em;
         }
 
         .comparison-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 40px;
+            gap: 32px;
             margin-bottom: 40px;
         }
 
         .pathway-section {
-            border-radius: 16px;
-            padding: 30px;
+            border-radius: 12px;
+            padding: 32px;
             position: relative;
-            min-height: 800px;
+            min-height: 700px;
         }
 
         .current-state {
-            background: linear-gradient(135deg, rgba(237, 96, 96, 0.1) 0%, rgba(237, 96, 96, 0.15) 100%);
-            border: 4px solid #ED6060;
+            background: var(--surface);
+            border-top: 5px solid var(--strawberry);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.04);
         }
 
         .designed-state {
-            background: linear-gradient(135deg, rgba(0, 147, 164, 0.05) 0%, rgba(0, 147, 164, 0.1) 100%);
-            border: 4px solid #0093A4;
+            background: var(--dark);
+            border-top: 5px solid var(--teal);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.12);
+            color: rgba(255,255,255,0.85);
         }
 
         .section-header {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 34px;
-            font-weight: 600;
-            margin-bottom: 8px;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             gap: 12px;
+            letter-spacing: -0.01em;
         }
 
-        .current-state .section-header {
-            color: #ED6060;
-        }
-
-        .designed-state .section-header {
-            color: #0093A4;
-        }
+        .current-state .section-header { color: var(--strawberry); }
+        .designed-state .section-header { color: white; }
 
         .status-badge {
-            font-size: 16px;
-            padding: 4px 12px;
-            border-radius: 20px;
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 10px;
+            padding: 3px 10px;
+            border-radius: 3px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         .current-state .status-badge {
-            background: #ED6060;
+            background: var(--strawberry);
             color: white;
         }
 
         .designed-state .status-badge {
-            background: #0093A4;
-            color: white;
+            background: var(--teal);
+            color: var(--dark);
         }
 
         .section-subtitle {
-            font-size: 14px;
-            margin-bottom: 30px;
-            font-style: italic;
+            font-size: 13px;
+            margin-bottom: 28px;
         }
 
-        .current-state .section-subtitle {
-            color: #ED6060;
-        }
-
-        .designed-state .section-subtitle {
-            color: #0093A4;
-        }
+        .current-state .section-subtitle { color: var(--text-muted); }
+        .designed-state .section-subtitle { color: rgba(255,255,255,0.45); }
 
         .parallel-tracks {
             display: grid;
-            gap: 16px;
+            gap: 12px;
             margin-bottom: 20px;
         }
 
         .track {
             background: white;
-            border: 3px solid rgba(237, 96, 96, 0.4);
-            border-radius: 12px;
-            padding: 16px;
+            border: 1px solid var(--warm-gray);
+            border-left: 4px solid var(--strawberry);
+            border-radius: 2px 8px 8px 2px;
+            padding: 14px 16px;
         }
 
         .track-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
-            color: #ED6060;
-            text-align: center;
-            margin-bottom: 12px;
+            color: var(--strawberry);
+            margin-bottom: 10px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.08em;
         }
 
         .course-box {
-            padding: 10px 14px;
-            border-radius: 6px;
-            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
             font-weight: 600;
             text-align: center;
-            margin-bottom: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 6px;
         }
 
-        .track-python .course-box, .course-box.track-python {
-            background: rgba(0, 147, 164, 0.15);
-            border: 2px solid #0093A4;
-            color: #0093A4;
+        /* Current state course boxes - muted, problem-state */
+        .track .course-box {
+            background: var(--canvas);
+            border: 1px solid var(--warm-gray);
+            color: var(--text);
         }
 
-        .track-design .course-box, .course-box.track-design {
-            background: rgba(140, 82, 186, 0.15);
-            border: 2px solid #8C52BA;
-            color: #8C52BA;
-        }
-
-        .track-network .course-box, .course-box.track-network {
-            background: rgba(0, 255, 245, 0.2);
-            border: 2px solid #00FFF5;
-            color: #0093A4;
-        }
-
-        .track-web .course-box, .course-box.track-web {
-            background: rgba(140, 82, 186, 0.1);
-            border: 2px solid #8C52BA;
-            color: #8C52BA;
-        }
-
-        .track-security .course-box, .course-box.track-security {
-            background: rgba(237, 96, 96, 0.15);
-            border: 2px solid #ED6060;
-            color: #ED6060;
-        }
-
-        .track-data .course-box, .course-box.track-data {
+        /* Designed state course boxes - colored by track */
+        .course-box.track-python {
             background: rgba(0, 147, 164, 0.1);
-            border: 2px solid #0093A4;
-            color: #0093A4;
+            border: 1px solid rgba(0, 147, 164, 0.3);
+            color: var(--teal);
+        }
+
+        .course-box.track-design, .course-box.track-web {
+            background: rgba(140, 82, 186, 0.1);
+            border: 1px solid rgba(140, 82, 186, 0.3);
+            color: var(--purple);
+        }
+
+        .course-box.track-network {
+            background: rgba(0, 217, 208, 0.1);
+            border: 1px solid rgba(0, 217, 208, 0.3);
+            color: var(--teal);
+        }
+
+        .course-box.track-security {
+            background: rgba(237, 96, 96, 0.1);
+            border: 1px solid rgba(237, 96, 96, 0.3);
+            color: var(--strawberry);
+        }
+
+        .course-box.track-data {
+            background: rgba(0, 147, 164, 0.08);
+            border: 1px solid rgba(0, 147, 164, 0.25);
+            color: var(--teal);
         }
 
         .course-arrow {
             text-align: center;
-            color: #9CA3AF;
-            font-size: 16px;
-            margin: 4px 0;
+            color: var(--warm-gray);
+            font-size: 14px;
+            margin: 2px 0;
         }
 
         .confusion-box {
-            background: rgba(237, 96, 96, 0.1);
-            border: 3px dashed #ED6060;
-            border-radius: 12px;
+            background: rgba(237, 96, 96, 0.05);
+            border: 2px dashed rgba(237, 96, 96, 0.3);
+            border-radius: 8px;
             padding: 20px;
             text-align: center;
             margin: 20px 0;
@@ -1036,83 +1271,103 @@ class PathwayComparisonGenerator:
 
         .confusion-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
-            color: #ED6060;
+            color: var(--strawberry);
             margin-bottom: 8px;
         }
 
         .confusion-text {
             font-size: 13px;
-            color: #292F36;
+            color: var(--text-secondary);
             line-height: 1.5;
+            font-style: italic;
         }
 
         .entry-point {
-            margin-bottom: 30px;
+            margin-bottom: 28px;
         }
 
         .entry-course {
-            background: linear-gradient(135deg, #00FFF5 0%, #00D9D0 100%);
-            border: 4px solid #00D9D0;
-            border-radius: 16px;
+            background: var(--teal);
+            border-radius: 10px;
             padding: 24px;
             text-align: center;
-            box-shadow: 0 8px 16px rgba(0, 255, 245, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .entry-course::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            pointer-events: none;
         }
 
         .entry-course-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
             font-size: 28px;
-            font-weight: 600;
-            color: #292F36;
-            margin-bottom: 8px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 4px;
+            position: relative;
+            letter-spacing: -0.01em;
         }
 
         .entry-course-subtitle {
-            font-size: 14px;
-            color: #0093A4;
-            font-weight: 600;
+            font-size: 13px;
+            color: rgba(255,255,255,0.7);
+            position: relative;
         }
 
         .semester-cards {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 12px;
+            gap: 10px;
+            margin-top: 14px;
+            position: relative;
         }
 
         .semester-card {
-            background: white;
-            border: 2px solid #0093A4;
-            border-radius: 12px;
-            padding: 14px;
-            position: relative;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .designed-state .semester-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         .semester-card-header {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 16px;
+            font-size: 11px;
             font-weight: 600;
-            color: #0093A4;
-            margin-bottom: 4px;
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 6px;
         }
 
         .semester-topics {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
         }
 
         .topic-badge {
-            background: rgba(0, 147, 164, 0.08);
-            border: 1px solid rgba(0, 147, 164, 0.25);
-            padding: 5px 8px;
-            border-radius: 6px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 3px 8px;
+            border-radius: 3px;
             font-size: 10px;
             font-weight: 600;
-            color: #0093A4;
-            text-align: center;
+            color: rgba(255,255,255,0.65);
         }
 
         .big-arrow {
@@ -1122,137 +1377,159 @@ class PathwayComparisonGenerator:
 
         .big-arrow-text {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
-            color: #0093A4;
-            margin-bottom: 8px;
+            color: var(--teal);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
 
         .big-arrow-icon {
-            font-size: 36px;
-            color: #0093A4;
+            font-size: 28px;
+            color: var(--teal);
         }
 
         .informed-tracks {
             display: grid;
-            gap: 12px;
+            gap: 10px;
         }
 
         .informed-track {
-            background: white;
-            border: 3px solid #0093A4;
-            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
             padding: 12px;
         }
 
         .informed-track-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
-            color: #0093A4;
+            color: var(--teal);
             text-align: center;
             margin-bottom: 8px;
             text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
 
         .informed-track .course-box {
-            font-size: 12px;
-            padding: 8px 10px;
+            font-size: 11px;
+            padding: 6px 10px;
         }
 
         .grade-label {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 16px;
+            font-size: 12px;
             font-weight: 600;
-            color: #6B7280;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 8px 0;
-            border-bottom: 2px solid #E5E7EB;
+            letter-spacing: 0.08em;
+            padding-bottom: 8px;
+        }
+
+        .current-state .grade-label {
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--warm-gray);
+        }
+
+        .designed-state .grade-label {
+            color: rgba(255,255,255,0.4);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
         .problem-box {
-            background: #FFFFFF;
-            border: 3px solid #ED6060;
-            border-radius: 12px;
+            background: rgba(237, 96, 96, 0.04);
+            border: 1px solid rgba(237, 96, 96, 0.2);
+            border-radius: 8px;
             padding: 20px;
             margin-top: 20px;
         }
 
         .problem-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
-            color: #ED6060;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            color: var(--strawberry);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
 
         .problem-list {
-            font-size: 13px;
-            color: #292F36;
+            font-size: 12px;
+            color: var(--text-secondary);
             line-height: 1.8;
         }
 
         .problem-list li {
-            margin-bottom: 8px;
-            padding-left: 8px;
+            margin-bottom: 6px;
+            padding-left: 4px;
         }
 
         .benefit-box {
-            background: #FFFFFF;
-            border: 3px solid #0093A4;
-            border-radius: 12px;
+            background: rgba(0, 147, 164, 0.06);
+            border: 1px solid rgba(0, 147, 164, 0.15);
+            border-radius: 8px;
             padding: 20px;
             margin-top: 20px;
         }
 
         .benefit-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
-            color: #0093A4;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            color: var(--teal);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
 
         .benefit-list {
-            font-size: 13px;
-            color: #292F36;
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
             line-height: 1.8;
         }
 
         .benefit-list li {
-            margin-bottom: 8px;
-            padding-left: 8px;
+            margin-bottom: 6px;
+            padding-left: 4px;
         }
 
         .impact-section {
-            background: linear-gradient(135deg, rgba(0, 147, 164, 0.05) 0%, rgba(0, 147, 164, 0.1) 100%);
-            border: 4px solid #0093A4;
-            border-radius: 16px;
-            padding: 40px;
+            background: var(--dark);
+            border-radius: 12px;
+            padding: 44px;
             text-align: center;
+            color: rgba(255,255,255,0.85);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .impact-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--strawberry), var(--teal));
         }
 
         .impact-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 32px;
-            font-weight: 600;
-            color: #0093A4;
-            margin-bottom: 20px;
+            font-size: 30px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
         }
 
         .impact-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: 30px;
+            gap: 32px;
+            margin-top: 28px;
         }
 
         .impact-column {
@@ -1261,40 +1538,40 @@ class PathwayComparisonGenerator:
 
         .impact-column-title {
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 20px;
+            font-size: 16px;
             font-weight: 600;
             margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
 
-        .impact-column.before .impact-column-title {
-            color: #ED6060;
-        }
-
-        .impact-column.after .impact-column-title {
-            color: #0093A4;
-        }
+        .impact-column.before .impact-column-title { color: var(--strawberry); }
+        .impact-column.after .impact-column-title { color: var(--teal); }
 
         .impact-text {
-            font-size: 14px;
-            color: #292F36;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
             line-height: 1.8;
         }
 
+        .impact-text strong {
+            color: rgba(255,255,255,0.85);
+        }
+
         .logo {
-            text-align: right;
-            margin-top: 30px;
+            text-align: center;
+            margin-top: 36px;
             font-family: 'Barlow Semi Condensed', sans-serif;
-            font-size: 14px;
-            color: #6B7280;
+            font-size: 12px;
+            color: var(--text-muted);
+            letter-spacing: 0.06em;
         }
 
         @media print {
-            body {
-                padding: 20px;
-            }
-            .comparison-container {
-                page-break-inside: avoid;
-            }
+            body { padding: 20px; background: white; }
+            .comparison-container { page-break-inside: avoid; }
+            .designed-state { background: #1A1D23 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .impact-section { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
     """
