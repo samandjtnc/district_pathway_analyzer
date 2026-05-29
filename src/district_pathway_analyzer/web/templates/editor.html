@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pathway Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+    <style>
+        :root {
+            --teal: #0093A4;
+            --teal-deep: #006B77;
+            --teal-glow: rgba(0, 147, 164, 0.35);
+            --purple: #8C52BA;
+            --strawberry: #ED6060;
+            --dark: #131518;
+            --dark-surface: #1C1F25;
+            --dark-border: #2A2D35;
+            --canvas: #F0EDE8;
+            --surface: #FAFAF8;
+            --warm-gray: #D5D0C8;
+            --text: #1A1D23;
+            --text-secondary: #6B6560;
+            --text-muted: #9B958E;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Figtree', sans-serif;
+            background: var(--canvas);
+            min-height: 100vh;
+            color: var(--text);
+        }
+
+        /* Canvas dot grid */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle, var(--warm-gray) 0.8px, transparent 0.8px);
+            background-size: 24px 24px;
+            opacity: 0.5;
+        }
+
+        /* ---- Toolbar ---- */
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--dark);
+            padding: 0 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 56px;
+            border-bottom: 3px solid var(--teal);
+        }
+
+        .toolbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .toolbar-logo {
+            width: 28px;
+            height: 28px;
+            background: var(--teal);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .toolbar-logo svg {
+            width: 16px;
+            height: 16px;
+            fill: white;
+        }
+
+        .toolbar-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 17px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.92);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toolbar-sep {
+            width: 1px;
+            height: 24px;
+            background: var(--dark-border);
+            flex-shrink: 0;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .toolbar-btn {
+            padding: 7px 18px;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Figtree', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.01em;
+        }
+
+        .btn-save {
+            background: var(--teal);
+            color: white;
+        }
+        .btn-save:hover { background: var(--teal-deep); box-shadow: 0 0 16px var(--teal-glow); }
+        .btn-save:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+
+        .btn-export {
+            background: var(--purple);
+            color: white;
+        }
+        .btn-export:hover { background: #7640A3; box-shadow: 0 0 16px rgba(140,82,186,0.35); }
+
+        .btn-back {
+            background: transparent;
+            color: rgba(255,255,255,0.5);
+            border: 1px solid var(--dark-border);
+        }
+        .btn-back:hover { color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.3); }
+
+        .save-indicator {
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.35);
+            letter-spacing: 0.02em;
+        }
+
+        .save-indicator.saved { color: var(--teal); }
+        .save-indicator.saving { color: #EAB308; }
+        .save-indicator.error { color: var(--strawberry); }
+
+        /* ---- Layout ---- */
+        .editor-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 32px 40px 60px;
+        }
+
+        /* ---- AIF Entry Point ---- */
+        .aif-section {
+            background: var(--dark);
+            border-radius: 14px;
+            padding: 32px 36px;
+            margin-bottom: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .aif-section::before {
+            content: '';
+            position: absolute;
+            top: -60%;
+            right: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, var(--teal-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .aif-header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 4px;
+            position: relative;
+        }
+
+        .aif-title {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.02em;
+        }
+
+        .aif-badge {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--dark);
+            background: var(--teal);
+            padding: 3px 10px;
+            border-radius: 3px;
+        }
+
+        .aif-subtitle {
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .semester-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            position: relative;
+        }
+
+        .semester-card {
+            background: var(--dark-surface);
+            border: 1px solid var(--dark-border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .semester-card-header {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--teal);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+        }
+
+        .semester-topics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .topic-badge {
+            background: rgba(0, 147, 164, 0.1);
+            border: 1px solid rgba(0, 147, 164, 0.2);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.7);
+        }
+
+        /* ---- Flow Connector ---- */
+        .flow-connector {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 6px;
+        }
+
+        .flow-line {
+            width: 2px;
+            height: 20px;
+            background: linear-gradient(to bottom, var(--teal), var(--warm-gray));
+        }
+
+        .flow-label {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .flow-line-2 {
+            width: 2px;
+            height: 16px;
+            background: linear-gradient(to bottom, var(--warm-gray), transparent);
+        }
+
+        /* ---- Pathways Grid ---- */
+        .pathways-grid {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        /* ---- Pathway Column ---- */
+        .pathway-column {
+            background: var(--surface);
+            border-radius: 10px;
+            min-height: 180px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.04);
+            transition: box-shadow 0.25s, transform 0.25s;
+            overflow: hidden;
+            animation: cardEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .pathway-column:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 12px 28px rgba(0,0,0,0.07);
+        }
+
+        @keyframes cardEnter {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pathway-accent {
+            height: 4px;
+        }
+
+        .accent-track-python { background: var(--teal); }
+        .accent-track-design { background: var(--purple); }
+        .accent-track-web { background: var(--purple); }
+        .accent-track-network { background: linear-gradient(90deg, var(--teal), #00D9D0); }
+        .accent-track-security { background: var(--strawberry); }
+        .accent-track-data { background: linear-gradient(90deg, var(--teal), var(--purple)); }
+
+        .pathway-inner {
+            padding: 16px;
+        }
+
+        .pathway-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .pathway-name {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            border: none;
+            background: transparent;
+            flex: 1;
+            padding: 3px 6px;
+            border-radius: 4px;
+            transition: all 0.15s;
+            min-width: 0;
+        }
+
+        .pathway-name:hover {
+            background: var(--canvas);
+        }
+
+        .pathway-name:focus {
+            outline: none;
+            background: var(--canvas);
+            box-shadow: 0 0 0 2px var(--teal);
+        }
+
+        .pathway-count {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            letter-spacing: 0.02em;
+        }
+
+        .pathway-delete {
+            background: none;
+            border: none;
+            color: var(--warm-gray);
+            cursor: pointer;
+            font-size: 18px;
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .pathway-delete:hover {
+            color: var(--strawberry);
+            background: rgba(237, 96, 96, 0.08);
+        }
+
+        /* ---- Course Cards ---- */
+        .course-list {
+            min-height: 48px;
+        }
+
+        .course-card {
+            background: white;
+            border: 1px solid #E8E5DF;
+            border-left: 4px solid var(--warm-gray);
+            border-radius: 2px 6px 6px 2px;
+            padding: 10px 12px 10px 14px;
+            margin-bottom: 6px;
+            cursor: grab;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .course-card:hover {
+            border-color: #D5D0C8;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transform: translateX(2px);
+        }
+
+        .course-card:active { cursor: grabbing; }
+
+        .course-card.sortable-ghost {
+            opacity: 0.3;
+            transform: scale(0.97);
+        }
+
+        .course-card.sortable-chosen {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            transform: scale(1.02) rotate(0.5deg);
+            z-index: 10;
+        }
+
+        /* Left border by role */
+        .course-card[data-role="exploratory"] { border-left-color: var(--teal); }
+        .course-card[data-role="gatekeeper"] { border-left-color: var(--purple); }
+        .course-card[data-role="concentrator"] { border-left-color: var(--strawberry); }
+        .course-card[data-role="capstone"] { border-left-color: var(--dark); }
+
+        .drag-handle {
+            color: var(--warm-gray);
+            font-size: 14px;
+            cursor: grab;
+            flex-shrink: 0;
+            user-select: none;
+            transition: color 0.15s;
+        }
+
+        .course-card:hover .drag-handle { color: var(--text-muted); }
+
+        .course-info { flex: 1; min-width: 0; }
+
+        .course-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .course-meta {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            margin-top: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .role-tag {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            padding: 2px 0;
+        }
+
+        /* ---- Add Pathway ---- */
+        .add-pathway-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border: 2px dashed var(--warm-gray);
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.02em;
+        }
+
+        .add-pathway-btn:hover {
+            border-color: var(--teal);
+            color: var(--teal);
+            background: rgba(0, 147, 164, 0.03);
+        }
+
+        /* ---- Loading ---- */
+        .loading {
+            text-align: center;
+            padding: 100px 0;
+            color: var(--text-muted);
+        }
+
+        .loading .spinner {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid var(--warm-gray);
+            border-top-color: var(--teal);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        .loading-text {
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---- Toast ---- */
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: white;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 200;
+            pointer-events: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success { background: var(--teal-deep); }
+        .toast.error { background: var(--strawberry); }
+
+        /* ---- Footer ---- */
+        .editor-footer {
+            text-align: center;
+            padding: 20px 0;
+            font-family: 'Barlow Semi Condensed', sans-serif;
+            font-size: 12px;
+            color: var(--text-muted);
+            letter-spacing: 0.04em;
+        }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 900px) {
+            .toolbar { padding: 0 20px; }
+            .editor-container { padding: 20px; }
+            .semester-cards { grid-template-columns: 1fr; }
+            .aif-section { padding: 24px 20px; }
+        }
+
+        @media (max-width: 600px) {
+            .pathways-grid { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <div class="toolbar-brand">
+        <div class="toolbar-logo">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="toolbar-title" id="toolbar-title">Pathway Editor</div>
+    </div>
+    <span class="save-indicator" id="save-indicator"></span>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-actions">
+        <button class="toolbar-btn btn-save" id="btn-save" disabled onclick="saveChanges()">Save</button>
+        <button class="toolbar-btn btn-export" id="btn-export" onclick="exportHtml()">Export</button>
+        <button class="toolbar-btn btn-back" id="btn-back" onclick="goBack()">Back</button>
+    </div>
+</div>
+
+<div class="editor-container" id="editor-container">
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading pathways...</div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    const JOB_ID = '{{job_id}}';
+    let pathwayData = null;
+    let isDirty = false;
+    let sortableInstances = [];
+
+    document.addEventListener('DOMContentLoaded', () => { loadPathways(); });
+
+    async function loadPathways() {
+        try {
+            const res = await fetch(`/api/pathways/${JOB_ID}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+            pathwayData = await res.json();
+            document.getElementById('toolbar-title').textContent =
+                `${pathwayData.metadata.district_name}, ${pathwayData.metadata.state}`;
+            render();
+        } catch (err) {
+            document.getElementById('loading').innerHTML =
+                `<div style="color: var(--strawberry); font-weight: 600;">Failed to load pathway data</div>
+                 <div style="margin-top: 8px; color: var(--text-muted);">${err.message}</div>`;
+        }
+    }
+
+    function render() {
+        const container = document.getElementById('editor-container');
+        const pathways = pathwayData.current_pathways;
+        const cols = pathways.length <= 3 ? pathways.length : (pathways.length <= 6 ? 3 : 4);
+
+        let html = '';
+
+        // AIF section
+        html += `
+        <div class="aif-section">
+            <div class="aif-header">
+                <div class="aif-title">AI Foundations</div>
+                <div class="aif-badge">Entry Point</div>
+            </div>
+            <div class="aif-subtitle">Every student explores the breadth of digital technology before specializing</div>
+            <div class="semester-cards">
+                <div class="semester-card">
+                    <div class="semester-card-header">Semester 1</div>
+                    <div class="semester-topics">
+                        <span class="topic-badge">Problem Solving with AI</span>
+                        <span class="topic-badge">AI Programming (Python)</span>
+                        <span class="topic-badge">Systems That Power AI</span>
+                        <span class="topic-badge">Internet &amp; Networks</span>
+                        <span class="topic-badge">Cybersecurity</span>
+                        <span class="topic-badge">Data Science</span>
+                    </div>
+                </div>
+                <div class="semester-card">
+                    <div class="semester-card-header">Semester 2</div>
+                    <div class="semester-topics">
+                        <span class="topic-badge">AI-Generated Design</span>
+                        <span class="topic-badge">Algorithmic Decisions</span>
+                        <span class="topic-badge">Data-Driven Systems</span>
+                        <span class="topic-badge">Iterating with AI</span>
+                        <span class="topic-badge">Apps with AI &amp; APIs</span>
+                        <span class="topic-badge">Web Apps Capstone</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flow-connector">
+            <div class="flow-line"></div>
+            <div class="flow-label">Informed Pathway Choice</div>
+            <div class="flow-line-2"></div>
+        </div>
+        `;
+
+        // Pathways grid
+        html += `<div class="pathways-grid" id="pathways-grid" style="grid-template-columns: repeat(${cols}, 1fr);">`;
+
+        pathways.forEach((pw, idx) => {
+            const accentClass = 'accent-' + (pw.color_class || 'track-python');
+            const delay = idx * 60;
+            html += `
+            <div class="pathway-column" data-pathway-idx="${idx}" style="animation-delay: ${delay}ms;">
+                <div class="pathway-accent ${accentClass}"></div>
+                <div class="pathway-inner">
+                    <div class="pathway-header">
+                        <input class="pathway-name" value="${escapeHtml(pw.name)}"
+                               data-idx="${idx}" onchange="onPathwayRename(this)" />
+                        <span class="pathway-count" id="count-${idx}">${pw.courses.length}</span>
+                        <button class="pathway-delete" title="Remove pathway" onclick="deletePathway(${idx})">&#215;</button>
+                    </div>
+                    <div class="course-list" id="course-list-${idx}" data-pathway-idx="${idx}">
+                        ${pw.courses.map(c => renderCourseCard(c)).join('')}
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+
+        html += '</div>';
+        html += `<button class="add-pathway-btn" onclick="addPathway()">+ Add Pathway</button>`;
+        html += `<div class="editor-footer">code.org &middot; Pathway Editor &middot; Drag courses to reorganize</div>`;
+
+        container.innerHTML = html;
+        initSortable();
+    }
+
+    function renderCourseCard(course) {
+        const role = course.role || 'unknown';
+        const roleLabel = role.replace(/_/g, ' ');
+        const domain = course.domain || '';
+        return `
+        <div class="course-card" data-course-id="${course.id}" data-role="${role}">
+            <span class="drag-handle">&#x2630;</span>
+            <div class="course-info">
+                <div class="course-title">${escapeHtml(course.title)}</div>
+                ${domain ? `<div class="course-meta">${escapeHtml(domain)}</div>` : ''}
+            </div>
+            <span class="role-tag">${roleLabel}</span>
+        </div>
+        `;
+    }
+
+    function initSortable() {
+        sortableInstances.forEach(s => s.destroy());
+        sortableInstances = [];
+        document.querySelectorAll('.course-list').forEach(el => {
+            const s = new Sortable(el, {
+                group: 'pathways',
+                animation: 200,
+                easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                handle: '.drag-handle',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onEnd: onDragEnd,
+            });
+            sortableInstances.push(s);
+        });
+    }
+
+    function onDragEnd(evt) { syncFromDom(); markDirty(); }
+
+    function syncFromDom() {
+        const pathways = pathwayData.current_pathways;
+        const courseById = {};
+        pathways.forEach(pw => { pw.courses.forEach(c => { courseById[c.id] = c; }); });
+        document.querySelectorAll('.course-list').forEach(listEl => {
+            const idx = parseInt(listEl.dataset.pathwayIdx);
+            const newCourses = [];
+            listEl.querySelectorAll('.course-card').forEach(cardEl => {
+                const cid = cardEl.dataset.courseId;
+                if (courseById[cid]) newCourses.push(courseById[cid]);
+            });
+            pathways[idx].courses = newCourses;
+            const countEl = document.getElementById(`count-${idx}`);
+            if (countEl) countEl.textContent = newCourses.length;
+        });
+        if (pathwayData.designed_state) {
+            pathwayData.designed_state.pathways = JSON.parse(JSON.stringify(pathways));
+        }
+    }
+
+    function onPathwayRename(input) {
+        const idx = parseInt(input.dataset.idx);
+        pathwayData.current_pathways[idx].name = input.value;
+        if (pathwayData.designed_state && pathwayData.designed_state.pathways[idx]) {
+            pathwayData.designed_state.pathways[idx].name = input.value;
+        }
+        markDirty();
+    }
+
+    function addPathway() {
+        const idx = pathwayData.current_pathways.length;
+        const newPathway = { id: `pathway-${idx}`, name: 'New Pathway', color_class: 'track-python', courses: [] };
+        pathwayData.current_pathways.push(newPathway);
+        if (pathwayData.designed_state) {
+            pathwayData.designed_state.pathways.push(JSON.parse(JSON.stringify(newPathway)));
+        }
+        markDirty();
+        render();
+    }
+
+    function deletePathway(idx) {
+        const pw = pathwayData.current_pathways[idx];
+        if (pw.courses.length > 0) {
+            if (!confirm(`"${pw.name}" has ${pw.courses.length} course(s). Delete anyway?`)) return;
+        }
+        pathwayData.current_pathways.splice(idx, 1);
+        if (pathwayData.designed_state) { pathwayData.designed_state.pathways.splice(idx, 1); }
+        markDirty();
+        render();
+    }
+
+    function markDirty() {
+        isDirty = true;
+        document.getElementById('btn-save').disabled = false;
+        document.getElementById('save-indicator').textContent = 'Unsaved';
+        document.getElementById('save-indicator').className = 'save-indicator';
+    }
+
+    async function saveChanges() {
+        const indicator = document.getElementById('save-indicator');
+        const btn = document.getElementById('btn-save');
+        indicator.textContent = 'Saving...';
+        indicator.className = 'save-indicator saving';
+        btn.disabled = true;
+        try {
+            const body = { current_pathways: pathwayData.current_pathways };
+            if (pathwayData.designed_state) body.designed_state = pathwayData.designed_state;
+            const res = await fetch(`/api/pathways/${JOB_ID}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            isDirty = false;
+            indicator.textContent = 'Saved';
+            indicator.className = 'save-indicator saved';
+            showToast('Changes saved', 'success');
+        } catch (err) {
+            indicator.textContent = 'Failed';
+            indicator.className = 'save-indicator error';
+            btn.disabled = false;
+            showToast('Save failed: ' + err.message, 'error');
+        }
+    }
+
+    async function exportHtml() {
+        if (isDirty) await saveChanges();
+        try {
+            const res = await fetch(`/api/pathways/${JOB_ID}/export`, { method: 'POST' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const html = await res.text();
+            const blob = new Blob([html], { type: 'text/html' });
+            window.open(URL.createObjectURL(blob), '_blank');
+            showToast('HTML exported', 'success');
+        } catch (err) {
+            showToast('Export failed: ' + err.message, 'error');
+        }
+    }
+
+    function goBack() {
+        if (isDirty && !confirm('Unsaved changes will be lost. Leave?')) return;
+        window.history.back();
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast ${type} show`;
+        setTimeout(() => { toast.className = 'toast'; }, 2500);
+    }
+
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+    });
+</script>
+</body>
+</html>
